@@ -23,11 +23,14 @@
     .section-title{margin:.8vh 0 1.2vh;font-size:2.4vh;font-weight:bold}
 
     /* 千葉（右側相当の大カード群） */
-    .chiba-section{display:flex;flex-direction:column;gap:1.6vh;margin-top:1vh}
-    .chiba-card{background:#1a2238;border-radius:1.2vh;padding:1.6vh 1.2vw;display:flex;gap:1vw;align-items:center}
-    .chiba-card .icon{width:10vh;height:10vh;flex:0 0 auto}
+    .chiba-section{display:grid;grid-template-columns: repeat(3, 1fr);gap: 1.6vh 1.2vw;margin-top:1vh;align-items: stretch;}
+    .chiba-card{background:#1a2238;border-radius:1.2vh;padding:1.6vh 1.2vw;display:flex;gap:1vw;align-items:center;}
+    .chiba-card .icon{width:9vh;height:9vh;flex:0 0 auto}
     .chiba-card .icon img{width:100%;height:100%;object-fit:contain}
-    .chiba-card .text{flex:1;font-size:2.2vh;line-height:1.5}
+    .chiba-card .text{flex:1;font-size:2.1vh;line-height:1.5}
+    /* 画面が狭い場合は自動で2列→1列に落とす */
+    @media (max-aspect-ratio: 16/10){.chiba-section{ grid-template-columns: repeat(2, 1fr); }}
+    @media (max-width: 900px){.chiba-section{ grid-template-columns: 1fr; }}
   </style>
 </head>
 <body>
