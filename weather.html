@@ -5,107 +5,38 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>天気予報（全国＋千葉）</title>
   <style>
-    html,body{
-      margin:0;
-      height:100%;
-      background:#0b1220;
-      color:#fff;
-      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,sans-serif
-    }
-    .wrap{
-      box-sizing:border-box;
-      padding:3vh 4vw;
-      display:flex;
-      flex-direction:column;
-      gap:2vh;
-      height:100%
-    }
+    html,body{margin:0;height:100%;background:#0b1220;color:#fff;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,sans-serif}
+    .wrap{box-sizing:border-box;padding:3vh 4vw;display:flex;flex-direction:column;gap:2vh;height:100%}
     .badge{font-size:1.6vh;opacity:.8}
     h1{margin:0;font-size:3.8vh;line-height:1.3}
     .meta{font-size:1.8vh;opacity:.85}
-    a{color:#8ab4ff;text-decoration:none}
-    a:hover{text-decoration:underline}
     .footer{margin-top:auto;font-size:1.4vh;opacity:.7;display:flex;justify-content:space-between}
 
-    /* 全国カードをグリッド配置 */
-    .nation-grid{
-      display:grid;
-      grid-template-columns:repeat(2,1fr);
-      gap:1.5vh 1.5vw;
-    }
-    @media (min-aspect-ratio: 16/9){
-      .nation-grid{grid-template-columns:repeat(4,1fr);}
-    }
-    .card{
-      background:#1a2238;
-      border-radius:1.2vh;
-      padding:1.6vh 1.2vw;
-      display:flex;
-      flex-direction:row;
-      align-items:flex-start;
-      gap:1vw;
-    }
-    .card .icon{
-      width:12vh;
-      height:12vh;
-      flex:0 0 auto;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-    }
-    .card .icon img{
-      width:100%;
-      height:100%;
-      object-fit:contain;
-    }
+    /* 全国カード */
+    .nation-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.5vh 1.5vw;}
+    @media (min-aspect-ratio:16/9){ .nation-grid{grid-template-columns:repeat(4,1fr);} }
+    .card{background:#1a2238;border-radius:1.2vh;padding:1.6vh 1.2vw;display:flex;align-items:flex-start;gap:1vw;}
+    .card .icon{width:12vh;height:12vh;flex:0 0 auto;display:flex;align-items:center;justify-content:center}
+    .card .icon img{width:100%;height:100%;object-fit:contain}
     .card .text{flex:1;font-size:2vh;line-height:1.4}
+    .section-title{margin:.8vh 0 1.2vh;font-size:2.4vh;font-weight:bold}
 
-    /* 千葉の詳細（右側） */
-    .chiba-section{
-      display:flex;
-      flex-direction:column;
-      gap:1.6vh;
-      margin-top:1vh;
-    }
-    .chiba-card{
-      background:#1a2238;
-      border-radius:1.2vh;
-      padding:1.6vh 1.2vw;
-      display:flex;
-      flex-direction:row;
-      gap:1vw;
-      align-items:center;
-    }
-    .chiba-card .icon{
-      width:10vh;
-      height:10vh;
-      flex:0 0 auto;
-    }
-    .chiba-card .icon img{
-      width:100%;
-      height:100%;
-      object-fit:contain;
-    }
-    .chiba-card .text{
-      flex:1;
-      font-size:2.2vh;
-      line-height:1.5
-    }
-
-    .section-title{
-      margin:.8vh 0 1.2vh;
-      font-size:2.4vh;
-      font-weight:bold;
-    }
+    /* 千葉（右側相当の大カード群） */
+    .chiba-section{display:flex;flex-direction:column;gap:1.6vh;margin-top:1vh}
+    .chiba-card{background:#1a2238;border-radius:1.2vh;padding:1.6vh 1.2vw;display:flex;gap:1vw;align-items:center}
+    .chiba-card .icon{width:10vh;height:10vh;flex:0 0 auto}
+    .chiba-card .icon img{width:100%;height:100%;object-fit:contain}
+    .chiba-card .text{flex:1;font-size:2.2vh;line-height:1.5}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="badge" id="badge">天気予報｜全国＋千葉（自動更新：10秒）</div>
+    <div class="badge" id="badge">天気予報｜全国＋千葉（自動更新：<span id="rot">10</span>秒）</div>
     <h1>日本の天気</h1>
     <div class="meta" id="meta"></div>
 
-    <div class="section-title">全国（今日）</div>
+    <div class="section-title" id="nationTitle">全国（今日）</div>
     <div class="nation-grid" id="nationGrid"></div>
 
     <div class="section-title">千葉の天気（今日〜数日）</div>
@@ -115,83 +46,111 @@
   </div>
 
   <script>
-  const GAS_JSON_URL = "https://script.google.com/macros/s/AKfycbwamQOwnRBo0Ys2ss4sZlfbGZbM-7RDq5KVnBLnO0inaAhA31gRTaTdvvZmSgZdwcOH-A/exec";
-  const DURATION = 10000;
-  let allItems=[], idx=0, timer=null;
+  // ★ あなたのGAS /exec に置換
+  const GAS_JSON_URL = "https://script.google.com/macros/s/＜あなたのGAS ID＞/exec";
+  const ROTATE_FALLBACK = 10000;
+
+  let allItems=[], ROTATE=ROTATE_FALLBACK, dayIndex=0, timer=null;
 
   async function boot(){
     try{
-      const r = await fetch(GAS_JSON_URL + "?nocache=1&t=" + Date.now(), {cache:"no-store"});
-      if(!r.ok) throw new Error("fetch failed");
+      // 1) fetch
+      const r = await fetch(GAS_JSON_URL+"?nocache=1&t="+Date.now(), {cache:"no-store"});
+      if(!r.ok) throw new Error("fetch failed: "+r.status);
       const j = await r.json();
-      allItems = Array.isArray(j.items)? j.items : [];
-      show(0);
-      timer = setInterval(()=>show(idx+1), DURATION);
+      afterLoad(j);
     }catch(e){
-      document.getElementById('meta').textContent = "データ取得エラー: " + e;
+      // 2) JSONP フォールバック
+      try{
+        const cb = "onWx_"+Math.random().toString(36).slice(2);
+        window[cb] = (j)=> afterLoad(j);
+        const s = document.createElement("script");
+        s.src = GAS_JSON_URL + "?callback=" + cb + "&nocache=1&t=" + Date.now();
+        s.onerror = ()=> document.getElementById('meta').textContent = "データ取得エラー：JSONP失敗";
+        document.head.appendChild(s);
+      }catch(err){
+        document.getElementById('meta').textContent = "データ取得エラー：" + (e && e.message ? e.message : e);
+      }
     }
   }
 
-  function show(i){
-    if(!allItems.length) return;
-    idx = (i%allItems.length+allItems.length)%allItems.length;
-    const today = new Date().toISOString().slice(0,10);
+  function afterLoad(j){
+    allItems = Array.isArray(j.items)? j.items : [];
+    ROTATE = (j.rotateSec? j.rotateSec*1000 : ROTATE_FALLBACK);
+    document.getElementById('rot').textContent = Math.round(ROTATE/1000);
+    if(!allItems.length){
+      document.getElementById('meta').textContent = "データが空です";
+      return;
+    }
+    dayIndex = 0;
+    renderDay(dayIndex);
+    clearInterval(timer);
+    timer = setInterval(()=>{ dayIndex = (dayIndex+1)%3; renderDay(dayIndex); }, ROTATE);
+  }
 
-    document.getElementById('meta').textContent =
-      `表示日：今日 ／ 都市数：${allItems.length}`;
+  function renderDay(d){
+    const nation = groupNationByDay(allItems, d);
+    const chiba  = pickChibaDays(allItems, d, 3);
 
-    // 全国（今日の8都市）
-    const nation = groupNationByDay(allItems, 0);
-    const g = document.getElementById('nationGrid');
-    g.innerHTML="";
-    nation.forEach(it=>{
-      g.innerHTML += `
-        <div class="card">
-          <div class="icon"><img src="${it.iconUrl}" alt=""></div>
-          <div class="text">
-            <b>${it.locName}</b><br>
-            ${it.summaryText}<br>
-            ${it.dateText}
-          </div>
-        </div>`;
-    });
+    document.getElementById('nationTitle').textContent = `全国（${["今日","明日","あさって"][d]||("+"+d+"日")}）`;
+    renderNation(nation);
+    renderChiba(chiba);
 
-    // 千葉の今日〜3日
-    const chiba = pickChibaDays(allItems,0,3);
-    const c = document.getElementById('chibaCards');
-    c.innerHTML="";
-    chiba.forEach(it=>{
-      c.innerHTML += `
-        <div class="chiba-card">
-          <div class="icon"><img src="${it.iconUrl}" alt=""></div>
-          <div class="text">
-            <b>${it.dateText}</b><br>
-            ${it.summaryText}
-          </div>
-        </div>`;
+    document.getElementById('meta').textContent = `表示日：${["今日","明日","あさって"][d]||("+"+d+"日")} ／ 都市数：${nation.length}`;
+  }
+
+  function el(tag, cls){ const e=document.createElement(tag); if(cls) e.className=cls; return e; }
+
+  function renderNation(list){
+    const grid = document.getElementById('nationGrid');
+    grid.innerHTML = "";
+    list.forEach(it=>{
+      const card = el("div","card");
+      const ico  = el("div","icon");
+      const img  = new Image(); img.src = it.iconUrl; img.alt = it.label || "";
+      ico.appendChild(img);
+      const info = el("div","text");
+      info.innerHTML = `<b>${it.locName||it.title||""}</b><br>${it.summaryText||""}<br>${it.dateText||""}`;
+      card.appendChild(ico); card.appendChild(info);
+      grid.appendChild(card);
     });
   }
 
+  function renderChiba(list){
+    const wrap = document.getElementById('chibaCards');
+    wrap.innerHTML = "";
+    list.forEach(it=>{
+      const card = el("div","chiba-card");
+      const ico  = el("div","icon");
+      const img  = new Image(); img.src = it.iconUrl; img.alt = it.label || "";
+      ico.appendChild(img);
+      const info = el("div","text");
+      info.innerHTML = `<b>${it.dateText||""}</b><br>${it.summaryText||""}`;
+      card.appendChild(ico); card.appendChild(info);
+      wrap.appendChild(card);
+    });
+  }
+
+  // d日目の全国（千葉を除く・対象都市のみ）
   function groupNationByDay(items, d){
     const targetCities = ["sapporo","sendai","tokyo","nagoya","osaka","hiroshima","fukuoka","naha"];
     const map = new Map();
     items.forEach(it=>{
       const di = Number(it.dayIndex ?? -1);
       const id = (it.locId||"").toLowerCase();
-      if(di===d && id && id!=="chiba"){
-        if(targetCities.includes(id)) map.set(id,it);
-      }
+      if (di===d && id && id!=="chiba" && targetCities.includes(id)) map.set(id, it);
     });
     const order = ["sapporo","sendai","tokyo","nagoya","osaka","hiroshima","fukuoka","naha"];
     return order.map(id=>map.get(id)).filter(Boolean);
   }
 
-  function pickChibaDays(items,startD,count){
+  // 千葉の d から count 日分
+  function pickChibaDays(items, startD, count){
     const arr=[];
     for(let k=0;k<count;k++){
-      const d = startD+k;
+      const d = startD + k;
       const it = items.find(x=>(x.locId||"").toLowerCase()==="chiba" && Number(x.dayIndex ?? -1)===d);
-      if(it) arr.push(it);
+      if (it) arr.push(it);
     }
     return arr;
   }
