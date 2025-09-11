@@ -51,6 +51,43 @@
       .wx-img{width:14vh}
       .article-text{font-size:2.6vh}
     }
+    /* 全国カードのアイコンを大きく＆正方形内でフィット */
+.card .icon{
+  width: 12vh;
+  height: 12vh;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card .icon img{
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* 全国カードの行間・高さを少し余裕に */
+.card{
+  align-items: flex-start;
+  padding: 1.6vh 1.2vw;
+  gap: 1.2vw;
+}
+
+/* セクション見出しのマージン調整（詰まり防止） */
+.section-title{ 
+  margin: .6vh 0 1.2vh; 
+}
+
+/* 右カラム（千葉側）のカード同士の間隔を少し広げる */
+#chibaCards > .article{
+  margin-bottom: 1.4vh;
+}
+
+/* 画面が広いときは全国カードを横3列→4列に（任意） */
+@media (min-aspect-ratio: 16/9){
+  .nation-grid{ grid-template-columns: repeat(4, 1fr); }
+}
+
   </style>
 </head>
 <body>
@@ -175,3 +212,5 @@
   </script>
 </body>
 </html>
+
+
