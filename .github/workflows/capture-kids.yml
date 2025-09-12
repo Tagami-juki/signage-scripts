@@ -2,7 +2,8 @@ name: Capture Kids Yahoo Today
 
 on:
   schedule:
-    - cron: "0 0 * * *"   # 毎日00:00 JST（GitHubはUTCなので調整が必要）
+    # 毎日00:00 JST（GitHubはUTCなので9時間引いた 15:00 UTC）
+    - cron: "0 15 * * *"
   workflow_dispatch:       # 手動実行も可
 
 jobs:
