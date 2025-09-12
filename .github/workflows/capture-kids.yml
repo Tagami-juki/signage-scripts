@@ -1,82 +1,34 @@
-name: Capture Kids Today
+name: Capture Kids Yahoo Today
 
 on:
   schedule:
-    # JST(UTC+9) 06:00-22:00 を30分おき（UTCだと 21-13時）
-    - cron: "*/30 21-23,0-13 * * *"
-  workflow_dispatch: {}
-
-permissions:
-  contents: write
+    - cron: "0 0 * * *"   # 毎日00:00 JST（GitHubはUTCなので調整が必要）
+  workflow_dispatch:       # 手動実行も可
 
 jobs:
-  capture:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - name: Checkout repo
+      uses: actions/checkout@v3
 
-      - name: Debug repo tree
-        run: |
-          pwd
-          ls -la
-          echo "---- shots"; ls -la shots || true
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 20
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
+    - name: Install dependencies
+      run: npm install puppeteer
 
-      - name: Install Japanese fonts
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y fonts-ipafont-gothic fonts-ipafont-mincho fonts-noto-cjk
-
-      - name: Install deps (puppeteer)
-        run: |
-          npm init -y
-          npm install puppeteer
-
-      - name: Ensure output dir
-        run: mkdir -p shots
-
-      # ← ここで Node を“インライン”で実行（ファイル不要・展開事故なし）
-      - name: Run capture inline
-        shell: bash
-        run: |
-          node - <<'NODE'
-          import puppeteer from "puppeteer";
-          const URL = "https://kids.yahoo.co.jp/today";
-          const OUT = "shots/kids-today.png";
-          const VIEWPORT = { width: 1920, height: 1080 };
-          (async () => {
-            const browser = await puppeteer.launch({
-              headless: "new",
-              args: ["--no-sandbox","--disable-setuid-sandbox","--lang=ja-JP,ja"],
-              defaultViewport: VIEWPORT,
-            });
-            const page = await browser.newPage();
-            await page.setExtraHTTPHeaders({ "Accept-Language": "ja-JP,ja;q=0.9" });
-            await page.setUserAgent(
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-              "AppleWebKit/537.36 (KHTML, like Gecko) " +
-              "Chrome/126.0.0.0 Safari/537.36"
-            );
-            await page.goto(URL, { waitUntil: "networkidle2", timeout: 120000 });
-            // 全画面スクショ（必要なら要素指定に切替可）
-            await page.screenshot({ path: OUT, type: "png" });
-            await browser.close();
-            console.log(`Saved: ${OUT}`);
-          })();
-          NODE
+    - name: Run capture script
+      run: node scripts/capture-kids.mjs
 
     - name: Commit & Push
       run: |
         git config user.name  "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git add shots/*.png
-        git commit -m "Update capture [skip ci]" || echo "No changes to commit"
+        git commit -m "Update kids today screenshot [skip ci]" || echo "No changes to commit"
         git pull --rebase origin main
         git push origin main
-
