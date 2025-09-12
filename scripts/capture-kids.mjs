@@ -2,6 +2,7 @@
 // Kids Yahoo!「今日は何の日」を対象要素キャプチャでスクリーンショット保存
 // Node: >= v20 / Puppeteer: 最新
 
+
 import fs from "node:fs";
 import puppeteer from "puppeteer";
 
