@@ -23,8 +23,8 @@ const VIEWPORT = { width: 1920, height: 1080 };
   await page.goto(URL, { waitUntil: "networkidle2", timeout: 120000 });
 
   // 必要なら要素限定キャプチャに変更可:
-  // const el = await page.$("main");
-  // await el.screenshot({ path: OUT });
+  const el = await page.$("main");
+  await el.screenshot({ path: OUT });
 
   await page.screenshot({ path: OUT, type: "png" });
 
