@@ -21,6 +21,17 @@ jobs:
 
     - name: Install dependencies
       run: npm install puppeteer
+      
+    - name: Show script head (sanity check)
+      run: |
+        echo "==== show first 120 lines ===="
+        sed -n '1,120p' scripts/capture-kids.mjs | sed 's/\t/    /g'
+        echo "==== grep for $x usage ===="
+        if grep -n '\$x(' scripts/capture-kids.mjs; then
+          echo 'ERROR: page.$x still exists in the file' && exit 1
+        else
+          echo 'OK: no $x usage'
+        fi
 
     - name: Run capture script
       run: node scripts/capture-kids.mjs
