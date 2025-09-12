@@ -2,9 +2,9 @@ name: Capture Kids Today
 
 on:
   schedule:
-    # JST(UTC+9) の 06:00〜22:00 を30分間隔で（UTCだと 21-13時）
+    # JST(UTC+9) 06:00-22:00 を30分おき（UTCだと 21-13時）
     - cron: "*/30 21-23,0-13 * * *"
-  workflow_dispatch: {}  # 手動実行ボタン
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -15,6 +15,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Show repo tree (debug)
+        run: |
+          pwd
+          ls -la
+          echo "----"
+          ls -la scripts || true
+          echo "----"
+          ls -la shots || true
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -31,8 +40,41 @@ jobs:
           npm init -y
           npm install puppeteer
 
-      - name: Ensure output dir
-        run: mkdir -p shots scripts
+      - name: Prepare dirs
+        run: |
+          mkdir -p scripts
+          mkdir -p shots
+
+      # ★ ここでスクリプトを書き出す（常に正しいパスに作成）
+      - name: Write capture script
+        run: |
+          cat > scripts/capture-kids.mjs <<'EOF'
+          import puppeteer from "puppeteer";
+          const URL = "https://kids.yahoo.co.jp/today";
+          const OUT = "shots/kids-today.png";
+          const VIEWPORT = { width: 1920, height: 1080 };
+          (async () => {
+            const browser = await puppeteer.launch({
+              headless: "new",
+              args: ["--no-sandbox","--disable-setuid-sandbox","--lang=ja-JP,ja"],
+              defaultViewport: VIEWPORT,
+            });
+            const page = await browser.newPage();
+            await page.setExtraHTTPHeaders({ "Accept-Language": "ja-JP,ja;q=0.9" });
+            await page.setUserAgent(
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+              "AppleWebKit/537.36 (KHTML, like Gecko) " +
+              "Chrome/126.0.0.0 Safari/537.36"
+            );
+            await page.goto(URL, { waitUntil: "networkidle2", timeout: 120000 });
+            // 必要なら特定要素のみ撮影: const el = await page.$("main"); await el.screenshot({ path: OUT });
+            await page.screenshot({ path: OUT, type: "png" });
+            await browser.close();
+            console.log(\`Saved: \${OUT}\`);
+          })();
+          EOF
+          node -v
+          ls -la scripts
 
       - name: Run capture script
         run: node scripts/capture-kids.mjs
