@@ -2,8 +2,7 @@ name: Capture Kids Today
 
 on:
   schedule:
-    # JST(UTC+9) 06:00-22:00 を30分おき（UTCだと 21-13時）
-    - cron: "*/30 21-23,0-13 * * *"
+    - cron: "*/30 21-23,0-13 * * *" # JST 06:00-22:00 を30分ごと
   workflow_dispatch: {}
 
 permissions:
@@ -16,14 +15,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Show repo tree (debug)
+      - name: Debug repo tree
         run: |
           pwd
           ls -la
-          echo "----"
-          ls -la scripts || true
-          echo "----"
-          ls -la shots || true
+          echo "---- scripts"; ls -la scripts || true
+          echo "---- shots";   ls -la shots || true
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -35,20 +32,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y fonts-ipafont-gothic fonts-ipafont-mincho fonts-noto-cjk
 
-      - name: Install deps
+      - name: Install deps (puppeteer)
         run: |
           npm init -y
           npm install puppeteer
 
-      - name: Prepare dirs
+      - name: Ensure dirs
         run: |
-          mkdir -p scripts
           mkdir -p shots
 
-      # ★ ここでスクリプトを書き出す（常に正しいパスに作成）
-      - name: Write capture script
+      # ★ スクリプトを“その場で”実行（ファイル作成不要）
+      - name: Run capture inline
+        shell: bash
         run: |
-          cat > scripts/capture-kids.mjs <<'EOF'
+          node - <<'NODE'
           import puppeteer from "puppeteer";
           const URL = "https://kids.yahoo.co.jp/today";
           const OUT = "shots/kids-today.png";
@@ -67,21 +64,16 @@ jobs:
               "Chrome/126.0.0.0 Safari/537.36"
             );
             await page.goto(URL, { waitUntil: "networkidle2", timeout: 120000 });
-            // 必要なら特定要素のみ撮影: const el = await page.$("main"); await el.screenshot({ path: OUT });
+            // 画面全体スクショ（必要なら要素指定に変更可）
             await page.screenshot({ path: OUT, type: "png" });
             await browser.close();
-            console.log(\`Saved: \${OUT}\`);
+            console.log(`Saved: ${OUT}`);
           })();
-          EOF
-          node -v
-          ls -la scripts
+          NODE
 
-      - name: Run capture script
-        run: node scripts/capture-kids.mjs
-
-      - name: Commit & push
+      - name: Commit & push image
         run: |
-          git config user.name "github-actions[bot]"
+          git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add shots/kids-today.png
           git commit -m "auto: capture kids today" || echo "no changes"
