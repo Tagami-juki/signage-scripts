@@ -2,7 +2,8 @@ name: Capture Kids Today
 
 on:
   schedule:
-    - cron: "*/30 21-23,0-13 * * *" # JST 06:00-22:00 を30分ごと
+    # JST(UTC+9) 06:00-22:00 を30分おき（UTCだと 21-13時）
+    - cron: "*/30 21-23,0-13 * * *"
   workflow_dispatch: {}
 
 permissions:
@@ -11,6 +12,7 @@ permissions:
 jobs:
   capture:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,8 +21,7 @@ jobs:
         run: |
           pwd
           ls -la
-          echo "---- scripts"; ls -la scripts || true
-          echo "---- shots";   ls -la shots || true
+          echo "---- shots"; ls -la shots || true
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -37,11 +38,10 @@ jobs:
           npm init -y
           npm install puppeteer
 
-      - name: Ensure dirs
-        run: |
-          mkdir -p shots
+      - name: Ensure output dir
+        run: mkdir -p shots
 
-      # ★ スクリプトを“その場で”実行（ファイル作成不要）
+      # ← ここで Node を“インライン”で実行（ファイル不要・展開事故なし）
       - name: Run capture inline
         shell: bash
         run: |
@@ -64,7 +64,7 @@ jobs:
               "Chrome/126.0.0.0 Safari/537.36"
             );
             await page.goto(URL, { waitUntil: "networkidle2", timeout: 120000 });
-            // 画面全体スクショ（必要なら要素指定に変更可）
+            // 全画面スクショ（必要なら要素指定に切替可）
             await page.screenshot({ path: OUT, type: "png" });
             await browser.close();
             console.log(`Saved: ${OUT}`);
