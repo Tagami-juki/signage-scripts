@@ -20,14 +20,69 @@ const VIEWPORT = { width: 1920, height: 1080 };
       "Chrome/126.0.0.0 Safari/537.36"
   );
 
-  await page.goto(URL, { waitUntil: "networkidle2", timeout: 120000 });
+  // ===== ここから要素限定キャプチャ（優先順でトライ） =====
+async function shootElementBySelectors(page, selectors, outPath) {
+  for (const sel of selectors) {
+    const el = await page.$(sel);
+    if (el) {
+      await el.screenshot({ path: outPath });
+      console.log(`Captured by selector: ${sel}`);
+      return true;
+    }
+  }
+  return false;
+}
 
-  // 必要なら要素限定キャプチャに変更可:
-  const el = await page.$("main");
-  await el.screenshot({ path: OUT });
+async function shootByHeadingText(page, headingText, outPath) {
+  // 見出しテキストに一致する要素を見つけ、親コンテナをたどる
+  const xp = `//*[self::h1 or self::h2 or self::h3][contains(normalize-space(.), '${headingText}')]`;
+  const nodes = await page.$x(xp);
+  if (nodes.length) {
+    // 近い親の section → div → main の順で探す
+    const target = await page.evaluateHandle((h) => {
+      const up = (el, tagList, maxHop=10) => {
+        let cur = el;
+        let hop = 0;
+        while (cur && hop < maxHop) {
+          cur = cur.parentElement;
+          if (!cur) break;
+          if (tagList.includes(cur.tagName.toLowerCase())) return cur;
+          hop++;
+        }
+        return null;
+      };
+      // 親 section があれば最優先、なければ div、最後に main 配下
+      return up(h, ["section"]) || up(h, ["div"]) || up(h, ["main"]) || h;
+    }, nodes[0]); // 先頭マッチを採用
 
-  await page.screenshot({ path: OUT, type: "png" });
+    const box = await (await target.asElement()).boundingBox();
+    if (box && box.width > 0 && box.height > 0) {
+      await (await target.asElement()).screenshot({ path: outPath });
+      console.log(`Captured by heading text: ${headingText}`);
+      return true;
+    }
+  }
+  return false;
+}
 
-  await browser.close();
-  console.log(`Saved: ${OUT}`);
+// 1) よくあるセレクタから試す
+const tried1 = await shootElementBySelectors(page, [
+  "main",                // 一般的なメイン領域
+  "main .today",         // ありがちな命名の保険
+  ".todayMain",          // 想定されるクラス名の保険
+  ".contents main",      // ラッパ内のmain
+], OUT);
+
+// 2) 見出しテキストで親ブロックを特定して撮る
+let tried2 = false;
+if (!tried1) {
+  tried2 = await shootByHeadingText(page, "今日は何の日", OUT);
+}
+
+// 3) それでもダメなら全画面
+if (!tried1 && !tried2) {
+  console.warn("Fallback to full-page capture.");
+  await page.screenshot({ path: OUT, fullPage: true });
+}
+// ===== ここまで要素限定キャプチャ =====
 })();
