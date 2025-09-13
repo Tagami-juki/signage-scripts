@@ -1,1 +1,197 @@
+name: Capture Kids Yahoo Today
 
+on:
+  workflow_dispatch: {}
+  schedule:
+    # JST 朝7時（UTC-9）に実行の例。必要に応じて調整してください。
+    - cron: "0 22 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Japanese fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto fonts-noto-cjk fonts-ipafont-gothic fonts-ipafont-mincho
+
+      - name: Init minimal project and install puppeteer
+        run: |
+          npm init -y
+          npm install puppeteer@22
+
+      - name: Ensure output dirs
+        run: |
+          mkdir -p shots scripts
+
+      - name: Generate capture script
+        shell: bash
+        run: |
+          cat > scripts/capture-kids.mjs <<'EOF'
+// Kids Yahoo!「今日は何の日」を“中央のカード領域だけ”要素キャプチャ
+import fs from "node:fs";
+import puppeteer from "puppeteer";
+
+const URL = "https://kids.yahoo.co.jp/today";
+const OUT = "shots/kids-today.png";
+const VIEWPORT = { width: 1920, height: 1080 };
+
+// 優先CSSセレクタ（先頭から順に試す）
+const CANDIDATES = [
+  '#__next > div > main > div[class^="Today_info__"]',
+  'main div[class^="Today_info__"]',
+  'main [class*="Today_info_"]',
+  'main section'
+];
+
+function ensureDirFor(p) {
+  const d = p.split("/").slice(0, -1).join("/");
+  if (d && !fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+}
+
+async function shootBySelectors(page, selectors, outPath) {
+  for (const sel of selectors) {
+    const el = await page.$(sel);
+    if (el) {
+      await el.screenshot({ path: outPath });
+      console.log("Captured by selector:", sel);
+      return true;
+    }
+  }
+  return false;
+}
+
+async function shootByHeadingFallback(page, outPath) {
+  // 「今日は何の日」の見出しから親要素をたどって撮る簡易フォールバック
+  const hs = await page.$$("h1, h2, h3");
+  for (const h of hs) {
+    const txt = await page.evaluate(el => (el.textContent || "").trim(), h);
+    if (!txt || !txt.includes("今日は何の日")) continue;
+
+    const handle = await page.evaluateHandle(el => {
+      const climb = (n, tags, max = 12) => {
+        let cur = n, hop = 0;
+        while (cur && hop < max) {
+          cur = cur.parentElement;
+          if (!cur) break;
+          if (tags.includes(cur.tagName.toLowerCase())) return cur;
+          hop++;
+        }
+        return null;
+      };
+      return climb(el, ["section"]) || climb(el, ["div"]) || climb(el, ["main"]) || el;
+    }, h);
+
+    const el = handle.asElement();
+    if (el) {
+      await el.screenshot({ path: outPath });
+      console.log("Captured by heading fallback.");
+      return true;
+    }
+  }
+  return false;
+}
+
+(async () => {
+  ensureDirFor(OUT);
+
+  const browser = await puppeteer.launch({
+    headless: "new",
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--lang=ja-JP,ja"
+    ],
+    defaultViewport: VIEWPORT
+  });
+
+  try {
+    const page = await browser.newPage();
+    await page.setExtraHTTPHeaders({ "Accept-Language": "ja-JP,ja;q=0.9" });
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    );
+
+    await page.goto(URL, { waitUntil: "networkidle2", timeout: 120000 });
+
+    // ページ全体の main が出るまで待つ（出なければ継続）
+    await page.waitForSelector("main", { timeout: 8000 }).catch(() => {});
+
+    const okSel = await shootBySelectors(page, CANDIDATES, OUT);
+    let okHead = false;
+    if (!okSel) okHead = await shootByHeadingFallback(page, OUT);
+
+    if (!okSel && !okHead) {
+      console.warn("Fallback to full-page capture.");
+      await page.screenshot({ path: OUT, fullPage: true });
+    }
+
+    console.log("SCRIPT_SIGNATURE: kids-today v3 NO_MAIN_FALLBACK");
+    console.log("Saved:", OUT);
+  } catch (e) {
+    console.error("Capture failed:", e);
+    process.exitCode = 1;
+  } finally {
+    await browser.close();
+  }
+})();
+EOF
+
+      - name: Guard - script must NOT contain 'Captured by selector: main'
+        run: |
+          if grep -q 'Captured by selector: main' scripts/capture-kids.mjs; then
+            echo "ERROR: script still contains main fallback."
+            exit 1
+          fi
+          echo "Guard OK"
+
+      - name: Run capture script
+        run: |
+          node scripts/capture-kids.mjs
+
+      - name: Commit & Push output (hard-sync)
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -e
+          echo "=== Hard-sync commit step ==="
+
+          # 結果を一時退避
+          cp -f shots/kids-today.png /tmp/kids-today.png 2>/dev/null || true
+          cp -f scripts/capture-kids.mjs /tmp/capture-kids.mjs 2>/dev/null || true
+
+          # リモートの最新で履歴をクリーンに
+          git fetch origin "$BRANCH"
+          git reset --hard "origin/$BRANCH"
+          git clean -fdx
+
+          # 退避した成果物を戻す
+          mkdir -p shots scripts
+          [ -f /tmp/kids-today.png ] && cp -f /tmp/kids-today.png shots/kids-today.png
+          [ -f /tmp/capture-kids.mjs ] && cp -f /tmp/capture-kids.mjs scripts/capture-kids.mjs
+
+          # コミット＆プッシュ
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -f shots/kids-today.png scripts/capture-kids.mjs 2>/dev/null || true
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Update kids-today capture [skip ci]"
+          git push origin HEAD:"$BRANCH"
