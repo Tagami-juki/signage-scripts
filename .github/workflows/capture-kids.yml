@@ -36,7 +36,7 @@ jobs:
           mkdir -p shots
           mkdir -p scripts
 
-      # ===== capture script を Python で生成（NO MAIN FALLBACK）=====
+      # ---- capture script を Python で生成（main フォールバックなし）----
       - name: Generate capture script
         shell: bash
         run: |
@@ -125,9 +125,21 @@ jobs:
             })();
           """).strip() + "\n"
           open("scripts/capture-kids.mjs", "w", encoding="utf-8").write(js)
+          echo_head = "\n".join(js.splitlines()[:24])
           print("=== head of scripts/capture-kids.mjs ===")
-          print("\n".join(js.splitlines()[:30]))
+          print(echo_head)
           PY
+
+      # ここが YAML 構文エラーになりやすい部分。必ずダブルクォートで囲む！
+      - name: "Guard - script must NOT contain: Captured by selector: main"
+        shell: bash
+        run: |
+          set -e
+          test -f scripts/capture-kids.mjs
+          if grep -q "Captured by selector: main" scripts/capture-kids.mjs; then
+            echo "Found forbidden fallback to 'main' in the script."
+            exit 1
+          fi
 
       - name: Run capture script
         run: node scripts/capture-kids.mjs
