@@ -112,7 +112,7 @@ jobs:
           })();
           NODE
 
-      # 変更があった場合のみ commit & push
+      # 変更があった場合のみ commit & push(プッシュ）
       - name: Commit & push if changed
         run: |
           set -e
