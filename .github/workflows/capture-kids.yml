@@ -145,37 +145,39 @@ jobs:
         run: node scripts/capture-kids.mjs
 
             # 生成結果（shots/kids-today.png）をコミット＆プッシュ
-      - name: Commit & Push output
+            # 生成された画像（shots/kids-today.png）だけをコミット＆プッシュ
+            
+      - name: Commit & Push output (hard-sync)
         env:
           BRANCH: ${{ github.ref_name }}
         run: |
           set -e
+          echo "=== Hard-sync commit step ==="
 
-          echo "=== Commit & Push output start ==="
+          # 1) 生成した画像を一時退避
+          cp -f shots/kids-today.png /tmp/kids-today.png
+
+          # 2) リポジトリをリモートの最新に強制同期（作業ツリーを一度クリーンに）
+          git fetch origin "$BRANCH"
+          # Actions は detached HEAD なので、そのまま origin/BRANCH に合わせる
+          git reset --hard "origin/$BRANCH"
+          git clean -fdx
+
+          # 3) 画像を復元
+          mkdir -p shots
+          cp -f /tmp/kids-today.png shots/kids-today.png
+
+          # 4) 画像だけステージ & コミット & プッシュ
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # 1) まずローカルの未コミット変更（生成したJSやpackage関連など）を
-          #    いったん全部 stash（うまく stash できなくても続行）
-          git stash push -u -m ci-temp || true
-
-          # 2) リモート最新を取り込み（rebase）
-          git fetch origin "$BRANCH"
-          git pull --rebase origin "$BRANCH" || true
-
-          # 3) さっき stash した内容を戻す（衝突しても続行）
-          git stash pop || true
-
-          # 4) 画像だけをステージング
           git add -f shots/kids-today.png || true
 
-          # 5) 画像に変更がないなら終了
+          # 変更がなければ終了
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0
           fi
 
-          # 6) コミット＆プッシュ
           git commit -m "Update kids-today capture [skip ci]"
           git push origin HEAD:"$BRANCH"
-          echo "=== Commit & Push output done ==="
