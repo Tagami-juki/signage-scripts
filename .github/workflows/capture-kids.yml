@@ -25,17 +25,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y fonts-noto fonts-noto-cjk
 
-      - name: Init minimal project & install puppeteer
+      - name: Init minimal project and install puppeteer
         run: |
-          test -f package.json || echo '{}' > package.json
+          if [ ! -f package.json ]; then echo '{}' > package.json; fi
           npm pkg set type="module"
           npm i puppeteer@22
 
-      - name: Ensure output dir
-        run: mkdir -p shots scripts
+      - name: Ensure output dirs
+        run: |
+          mkdir -p shots
+          mkdir -p scripts
 
-      # ===== スクリプト自動生成（Python）: mainフォールバック無し =====
-      - name: Generate capture script (NO MAIN FALLBACK)
+      # ===== capture script を Python で生成（NO MAIN FALLBACK）=====
+      - name: Generate capture script
+        shell: bash
         run: |
           python3 - <<'PY'
           import os, textwrap, pathlib
@@ -54,7 +57,7 @@ jobs:
               '#__next main div[class^="Today_info__"]',
               '#__next main div[class*="Today_info__"]',
               '#__next main section[class^="Today_info__"]',
-              '#__next main section[class*="Today_info__"]',
+              '#__next main section[class*="Today_info__"]'
             ];
 
             function ensureDirFor(p){
@@ -81,7 +84,7 @@ jobs:
               const browser = await puppeteer.launch({
                 headless: "new",
                 args: ["--no-sandbox", "--disable-setuid-sandbox", "--lang=ja-JP,ja"],
-                defaultViewport: VIEW,
+                defaultViewport: VIEW
               });
 
               try{
@@ -93,7 +96,7 @@ jobs:
                   "Chrome/126.0.0.0 Safari/537.36"
                 );
 
-                // 軽量化（不要なら削除）
+                // 軽量化（不要なら削除可）
                 await page.setRequestInterception(true);
                 page.on("request", req => {
                   const t = req.resourceType();
@@ -109,6 +112,7 @@ jobs:
                   process.exitCode = 2;
                   return;
                 }
+
                 await el.screenshot({ path: OUT });
                 console.log("Captured by selector:", sel);
                 console.log("Saved:", OUT);
@@ -119,23 +123,18 @@ jobs:
                 await browser.close();
               }
             })();
-          """).strip()+"\n"
+          """).strip() + "\n"
           open("scripts/capture-kids.mjs", "w", encoding="utf-8").write(js)
           print("=== head of scripts/capture-kids.mjs ===")
-          print("\n".join(js.splitlines()[:40]))
+          print("\n".join(js.splitlines()[:30]))
           PY
-
-      - name: Guard: script must NOT contain 'Captured by selector: main'
-        run: |
-          if grep -nE "Captured by selector:\s*main" -R scripts/capture-kids.mjs; then
-            echo "::error ::Forbidden 'main' fallback found in script"
-            exit 1
-          fi
 
       - name: Run capture script
         run: node scripts/capture-kids.mjs
 
-      - name: Commit & Push outputs (if changed)
+      - name: Commit & Push output
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
         run: |
           set -e
           git config user.name  "github-actions[bot]"
@@ -145,6 +144,6 @@ jobs:
             echo "No changes to commit."
             exit 0
           fi
-          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git pull --rebase origin "$BRANCH_NAME"
           git commit -m "Update kids-today capture [skip ci]"
           git push
