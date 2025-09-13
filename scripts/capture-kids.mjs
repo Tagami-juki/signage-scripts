@@ -5,7 +5,7 @@ import puppeteer from "puppeteer";
 const URL = "https://kids.yahoo.co.jp/today/";
 const OUT = "shots/kids-today.png";
 
-// ここがポイント：クラスの接頭辞にマッチさせて耐久性UP
+// ← ここを Today_info__ の接頭辞一致に
 const SEL = '#__next > div > main > div[class^="Today_info__"]';
 
 const VIEWPORT = { width: 1920, height: 1080 };
@@ -22,10 +22,8 @@ const WAIT = 15000; // 最大待機
     const page = await browser.newPage();
     await page.setViewport(VIEWPORT);
 
-    // ページ読込
     await page.goto(URL, { waitUntil: "networkidle2", timeout: 60000 });
 
-    // 対象要素を待つ
     const el = await page.waitForSelector(SEL, { visible: true, timeout: WAIT });
     if (!el) {
       console.warn("Target element not found, fallback to full page.");
@@ -34,19 +32,16 @@ const WAIT = 15000; // 最大待機
       return;
     }
 
-    // 画面内に入れてから要素スクショ
     await page.evaluate((selector) => {
       const n = document.querySelector(selector);
       if (n) n.scrollIntoView({ block: "center", inline: "center" });
     }, SEL);
 
-    // そのまま element.screenshot で撮る（余白が欲しければ clip計算に切替可）
     await el.screenshot({ path: OUT });
     console.log(`Captured by selector: ${SEL}`);
     console.log("Saved:", OUT);
   } catch (e) {
     console.error("Capture error:", e);
-    // 最後の砦
     try {
       const pages = await browser.pages();
       if (pages && pages[0]) {
