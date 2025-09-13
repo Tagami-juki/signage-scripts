@@ -144,35 +144,38 @@ jobs:
       - name: Run capture script
         run: node scripts/capture-kids.mjs
 
+            # 生成結果（shots/kids-today.png）をコミット＆プッシュ
       - name: Commit & Push output
         env:
-          BRANCH_NAME: ${{ github.ref_name }}
+          BRANCH: ${{ github.ref_name }}
         run: |
           set -e
+
+          echo "=== Commit & Push output start ==="
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # 生成物（画像）だけをステージング
+          # 1) まずローカルの未コミット変更（生成したJSやpackage関連など）を
+          #    いったん全部 stash（うまく stash できなくても続行）
+          git stash push -u -m ci-temp || true
+
+          # 2) リモート最新を取り込み（rebase）
+          git fetch origin "$BRANCH"
+          git pull --rebase origin "$BRANCH" || true
+
+          # 3) さっき stash した内容を戻す（衝突しても続行）
+          git stash pop || true
+
+          # 4) 画像だけをステージング
           git add -f shots/kids-today.png || true
 
-          # 1) リモート最新を取得しつつ、ローカル変更（生成したJS等）は自動で退避
-          git fetch origin "$BRANCH_NAME"
-          # Git が --autostash をサポートしている環境なのでまずこちらを試す
-          if git pull --rebase --autostash origin "$BRANCH_NAME"; then
-            echo "Pulled with --autostash"
-          else
-            # 念のためのフォールバック（keep-index: ステージ済みの画像は保持）
-            echo "Fallback to manual stash..."
-            git stash -u --keep-index
-            git pull --rebase origin "$BRANCH_NAME"
-            git stash drop || true
-          fi
-
-          # 画像に差分がなければ何もしない
+          # 5) 画像に変更がないなら終了
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0
           fi
 
+          # 6) コミット＆プッシュ
           git commit -m "Update kids-today capture [skip ci]"
-          git push origin HEAD:"$BRANCH_NAME"
+          git push origin HEAD:"$BRANCH"
+          echo "=== Commit & Push output done ==="
