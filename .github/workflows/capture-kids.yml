@@ -151,11 +151,28 @@ jobs:
           set -e
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add shots/kids-today.png
+
+          # 生成物（画像）だけをステージング
+          git add -f shots/kids-today.png || true
+
+          # 1) リモート最新を取得しつつ、ローカル変更（生成したJS等）は自動で退避
+          git fetch origin "$BRANCH_NAME"
+          # Git が --autostash をサポートしている環境なのでまずこちらを試す
+          if git pull --rebase --autostash origin "$BRANCH_NAME"; then
+            echo "Pulled with --autostash"
+          else
+            # 念のためのフォールバック（keep-index: ステージ済みの画像は保持）
+            echo "Fallback to manual stash..."
+            git stash -u --keep-index
+            git pull --rebase origin "$BRANCH_NAME"
+            git stash drop || true
+          fi
+
+          # 画像に差分がなければ何もしない
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0
           fi
-          git pull --rebase origin "$BRANCH_NAME"
+
           git commit -m "Update kids-today capture [skip ci]"
-          git push
+          git push origin HEAD:"$BRANCH_NAME"
