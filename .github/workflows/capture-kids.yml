@@ -1,10 +1,14 @@
 name: Capture Kids Yahoo Today
 
 on:
-  workflow_dispatch: {}
+  # 手動実行
+  workflow_dispatch:
+  # （任意）毎朝 06:05 JST に実行する例。不要なら消してください。
   schedule:
-    # 適宜調整。毎日 06:15 JST (= 21:15 UTC) に実行
-    - cron: "15 21 * * *"
+    - cron: '5 21 * * *'   # UTC 21:05 = JST 06:05
+
+permissions:
+  contents: write
 
 jobs:
   capture:
@@ -14,31 +18,30 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # 日本語フォント（IPAex）を入れておくと文字が化けにくいです
-      - name: Install Japanese fonts
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y fonts-ipaexfont
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: '20'
 
-      - name: Install dependencies (puppeteer)
+      - name: Install Japanese fonts (for text rendering)
         run: |
-          npm init -y
-          npm install puppeteer
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto fonts-noto-cjk
+
+      - name: Init minimal project & install puppeteer
+        run: |
+          test -f package.json || echo '{}' > package.json
+          npm pkg set type="module"
+          npm i puppeteer@22
 
       - name: Ensure output dir
         run: mkdir -p shots
 
-      # ====== スクリプト自動生成（ここがポイント）======
       - name: Generate capture script (mjs)
         run: |
           mkdir -p scripts
           cat > scripts/capture-kids.mjs <<'EOF'
-          // Kids Yahoo!「今日は何の日」要素のみキャプチャ（Puppeteer）
+          // Kids Yahoo!「今日は何の日」 Today_info 部分だけをキャプチャ
           import fs from "node:fs";
           import puppeteer from "puppeteer";
 
@@ -46,74 +49,101 @@ jobs:
           const OUT  = "shots/kids-today.png";
           const VIEW = { width: 1920, height: 1080 };
 
-          // キャプチャ対象のセレクタ（BEMでClass名にサフィックスが付くので前方一致）
-          const SEL  = '#__next > div > main > div[class^="Today_info__"]';
+          // ビルド毎にクラス末尾が変わるため前方/部分一致で複数候補を用意
+          const CANDIDATES = [
+            '#__next > div > main > div[class^="Today_info__"]',
+            '#__next main div[class^="Today_info__"]',
+            '#__next main div[class*="Today_info__"]',
+            '#__next main section[class^="Today_info__"]',
+            '#__next main section[class*="Today_info__"]',
+          ];
 
-          function ensureDirFor(p) {
-            const d = p.split("/").slice(0, -1).join("/");
+          function ensureDirFor(p){
+            const d = p.split("/").slice(0,-1).join("/");
             if (d && !fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
           }
 
-          (async () => {
-            ensureDirFor(OUT);
+          async function waitAndPick(page){
+            // ページ安定化
+            await page.waitForSelector("main", { timeout: 15000 }).catch(()=>{});
+            // 候補セレクタを順にチェック
+            for (const sel of CANDIDATES){
+              try{
+                await page.waitForSelector(sel, { timeout: 4000 });
+                const el = await page.$(sel);
+                if (el) return { el, sel };
+              }catch{}
+            }
+            return { el:null, sel:null };
+          }
 
+          (async ()=>{
+            ensureDirFor(OUT);
             const browser = await puppeteer.launch({
               headless: "new",
               args: ["--no-sandbox", "--disable-setuid-sandbox", "--lang=ja-JP,ja"],
               defaultViewport: VIEW,
             });
 
-            try {
+            try{
               const page = await browser.newPage();
               await page.setExtraHTTPHeaders({ "Accept-Language": "ja-JP,ja;q=0.9" });
               await page.setUserAgent(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-                "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+                "AppleWebKit/537.36 (KHTML, like Gecko) " +
+                "Chrome/126.0.0.0 Safari/537.36"
               );
+
+              // 軽量化（不要ならコメントアウト）
+              await page.setRequestInterception(true);
+              page.on("request", req => {
+                const t = req.resourceType();
+                if (t === "image" || t === "font" || t === "media") req.abort();
+                else req.continue();
+              });
 
               await page.goto(URL, { waitUntil: "networkidle2", timeout: 120000 });
 
-              // 対象要素が表示されるまで待機
-              await page.waitForSelector(SEL, { timeout: 15000 });
-
-              const el = await page.$(SEL);
+              const { el, sel } = await waitAndPick(page);
               if (el) {
                 await el.screenshot({ path: OUT });
-                console.log("Captured by selector:", SEL);
+                console.log("Captured by selector:", sel);
               } else {
-                console.warn("Target not found. Fallback to full page.");
-                await page.screenshot({ path: OUT, fullPage: true });
+                console.error("Target selector not found. No fallback to 'main'.");
+                process.exitCode = 2;
+                return;
               }
-
               console.log("Saved:", OUT);
-            } catch (e) {
+            }catch(e){
               console.error("Capture failed:", e);
               process.exitCode = 1;
-            } finally {
+            }finally{
               await browser.close();
             }
           })();
           EOF
 
+      - name: Show generated script head (sanity)
+        run: |
+          echo "=== scripts/capture-kids.mjs (head) ==="
+          sed -n '1,120p' scripts/capture-kids.mjs
+
       - name: Run capture script
         run: node scripts/capture-kids.mjs
 
-      # ====== 競合回避＆Push（生成物を優先）======
-      - name: Commit & Push outputs
+      - name: Commit & Push outputs (if changed)
         run: |
-          set -e
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add -A
+          # 変更があるかだけ先に確認
+          git add -A shots/kids-today.png
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0
           fi
 
+          # 衝突回避してからコミット
+          git pull --rebase origin "${GITHUB_REF_NAME}"
           git commit -m "Update kids-today capture [skip ci]"
-
-          # rebase ではなく merge、競合時は今回生成物(ours)を採用
-          git fetch origin main
-          git merge -X ours --no-edit origin/main || true
-          git push origin HEAD:main
+          git push
