@@ -1,103 +1,61 @@
 name: Capture Kids Yahoo Today
 
 on:
-  schedule:
-    # 毎日00:00 JST（GitHubはUTCなので9時間引いた 15:00 UTC）
-    - cron: "0 15 * * *"
-  workflow_dispatch:       # 手動実行も可
+  workflow_dispatch: {}     # 手動実行のみ（慣れるまでおすすめ）
+  # schedule:
+  #   - cron: "0 15 * * *"  # JST 00:00（= UTC 15:00）に毎日回す場合
+
+permissions:
+  contents: write
 
 jobs:
-  build:
+  capture:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: 20
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-    - name: Install dependencies
-      run: npm install puppeteer
-      
-    - name: Show script head (sanity check)
-      run: |
-        echo "==== show first 120 lines ===="
-        sed -n '1,120p' scripts/capture-kids.mjs | sed 's/\t/    /g'
-        echo "==== grep for $x usage ===="
-        if grep -n '\$x(' scripts/capture-kids.mjs; then
-          echo 'ERROR: page.$x still exists in the file' && exit 1
-        else
-          echo 'OK: no $x usage'
-        fi
+      - name: Install Japanese fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-ipafont-gothic fonts-ipafont-mincho fonts-noto-cjk
 
-    - name: Run capture inline (no-$x)
-      shell: bash
-      run: |
-        node - <<'NODE'
-        import fs from "node:fs";
-        import puppeteer from "puppeteer";
-        const URL = "https://kids.yahoo.co.jp/today";
-        const OUT = "shots/kids-today.png";
-        const VIEWPORT = { width: 1920, height: 1080 };
+      - name: Install puppeteer
+        run: |
+          npm init -y
+          npm install puppeteer
 
-        const ensureDirFor = (p) => {
-          const d = p.split("/").slice(0,-1).join("/");
-          if (d && !fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
-        };
+      - name: Ensure output dir
+        run: mkdir -p shots
 
-        async function shootElementBySelectors(page, selectors, outPath) {
-          for (const sel of selectors) {
-            const el = await page.$(sel);
-            if (el) { await el.screenshot({ path: outPath }); console.log("Captured by selector:", sel); return true; }
-          }
-          return false;
-        }
-        async function shootByHeadingText(page, headingText, outPath) {
-          const hs = await page.$$("h1, h2, h3");
-          for (const h of hs) {
-            const txt = await page.evaluate(el => (el.textContent||"").trim(), h);
-            if (!txt || !txt.includes(headingText)) continue;
-            const container = await page.evaluateHandle(el=>{
-              const up=(n,t,max=12)=>{let c=n,h=0;while(c&&h<max){c=c.parentElement;if(!c)break;if(t.includes(c.tagName.toLowerCase()))return c;h++;}return null;};
-              return up(el,["section"])||up(el,["div"])||up(el,["main"])||el;
-            }, h);
-            const el = container.asElement();
-            if (el){ await el.screenshot({ path: outPath }); console.log("Captured by heading text:", headingText); return true; }
-          }
-          return false;
-        }
+      # ★ここが Sanity check（Run capture script の直前に置く）
+      - name: Sanity check script ($x detector)
+        run: |
+          echo "==== working dir ====" && pwd
+          echo "==== list scripts dir ====" && (ls -la scripts || true)
+          echo "==== head of script ===="
+          sed -n '1,120p' scripts/capture-kids.mjs || { echo "File not found"; exit 1; }
+          echo "==== grep $x ===="
+          if grep -n '\$x(' scripts/capture-kids.mjs; then
+            echo 'ERROR: $x still exists in scripts/capture-kids.mjs'
+            exit 1
+          else
+            echo 'OK: no $x usage'
+          fi
 
-        (async()=>{
-          ensureDirFor(OUT);
-          const browser = await puppeteer.launch({
-            headless: "new",
-            args:["--no-sandbox","--disable-setuid-sandbox","--lang=ja-JP,ja"],
-            defaultViewport: VIEWPORT,
-          });
-          try{
-            const page = await browser.newPage();
-            await page.setExtraHTTPHeaders({"Accept-Language":"ja-JP,ja;q=0.9"});
-            await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36");
-            await page.goto(URL,{waitUntil:"networkidle2",timeout:120000});
-            await page.waitForSelector("main",{timeout:8000}).catch(()=>{});
-            const ok1 = await shootElementBySelectors(page, ["main","main .today",".todayMain",".contents main"], OUT);
-            let ok2=false; if(!ok1) ok2 = await shootByHeadingText(page,"今日は何の日",OUT);
-            if(!ok1 && !ok2){ console.warn("Fallback to full-page capture."); await page.screenshot({path:OUT,fullPage:true}); }
-            console.log("Saved:", OUT);
-          }catch(e){ console.error("Capture failed:", e); process.exitCode=1; }
-          finally{ await browser.close(); }
-        })();
-        NODE
+      - name: Run capture script
+        run: node scripts/capture-kids.mjs
 
-
-    - name: Commit & Push
-      run: |
-        git config user.name  "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add shots/*.png
-        git commit -m "Update kids today screenshot [skip ci]" || echo "No changes to commit"
-        git pull --rebase origin main
-        git push origin main
+      - name: Commit & Push image
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add shots/*.png
+          git commit -m "Update kids today screenshot [skip ci]" || echo "No changes to commit"
+          git pull --rebase origin main
+          git push origin main
