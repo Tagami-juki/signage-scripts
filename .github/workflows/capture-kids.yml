@@ -121,29 +121,36 @@ jobs:
 
       # 8) 生成画像だけを安全にコミット＆プッシュ（ハードリセット方式）
       - name: Commit & Push output (hard-sync)
-        env:
-          BRANCH: ${{ github.ref_name }}
-        run: |
-          set -e
-          echo "=== Hard-sync commit step ==="
-          cp -f shots/kids-today.png /tmp/kids-today.png
+          env:
+    BRANCH: ${{ github.ref_name }}
+  run: |
+    set -e
+    echo "=== Hard-sync commit step ==="
 
-          git fetch origin "$BRANCH"
-          git reset --hard "origin/$BRANCH"
-          git clean -fdx
+    # 実行結果を一時退避
+    cp -f shots/kids-today.png /tmp/kids-today.png 2>/dev/null || true
+    cp -f scripts/capture-kids.mjs /tmp/capture-kids.mjs 2>/dev/null || true
 
-          mkdir -p shots
-          cp -f /tmp/kids-today.png shots/kids-today.png
+    # 履歴は origin/<branch> に合わせてクリーンに戻す
+    git fetch origin "$BRANCH"
+    git reset --hard "origin/$BRANCH"
+    git clean -fdx
 
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+    # 退避しておいた成果物を戻す
+    mkdir -p shots scripts
+    [ -f /tmp/kids-today.png ] && cp -f /tmp/kids-today.png shots/kids-today.png
+    [ -f /tmp/capture-kids.mjs ] && cp -f /tmp/capture-kids.mjs scripts/capture-kids.mjs
 
-          git add -f shots/kids-today.png
+    # コミット＆プッシュ
+    git config user.name  "github-actions[bot]"
+    git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-            exit 0
-          fi
+    git add -f shots/kids-today.png scripts/capture-kids.mjs 2>/dev/null || true
 
-          git commit -m "Update kids-today capture [skip ci]"
-          git push origin HEAD:"$BRANCH"
+    if git diff --cached --quiet; then
+      echo "No changes to commit."
+      exit 0
+    fi
+
+    git commit -m "Update kids-today capture [skip ci]"
+    git push origin HEAD:"$BRANCH"
