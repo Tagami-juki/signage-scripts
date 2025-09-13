@@ -1,3 +1,64 @@
+name: Capture Kids Yahoo Today
+
+on:
+  workflow_dispatch: {}          # 手動実行
+  # 毎日回すなら（JST 06:00 実行の例＝UTC 21:00）
+  # schedule:
+  #   - cron: "0 21 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Japanese fonts (for rendered text)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            fonts-ipafont-gothic fonts-ipafont-mincho \
+            fonts-noto-cjk
+
+      - name: Install dependencies (puppeteer)
+        run: |
+          npm init -y
+          npm install puppeteer
+
+      - name: Ensure output dir
+        run: mkdir -p shots
+
+      # --- ここで実ファイルの中身を確認し、$x が残っていれば失敗(exit 2) ---
+      - name: Sanity check script ($x detector & show head)
+        run: |
+          echo "=== list scripts dir ==="
+          ls -la scripts || true
+          echo "=== head of scripts/capture-kids.mjs ==="
+          sed -n '1,120p' scripts/capture-kids.mjs || { echo "scripts/capture-kids.mjs not found"; exit 1; }
+          echo "=== grep for \$x ==="
+          if grep -n '\$x(' scripts/capture-kids.mjs; then
+            echo 'NG: $x is still used in scripts/capture-kids.mjs'
+            exit 2
+          else
+            echo 'OK: no $x usage'
+          fi
+
+      # --- 上のステップが失敗（=旧版）だった場合のみ、新版で強制上書き ---
+      - name: Force replace script when old ($x present)
+        if: failure()         # 直前ステップが失敗時のみ発火
+        run: |
+          echo "Overwriting scripts/capture-kids.mjs with no-$x version"
+          mkdir -p scripts
+          cat > scripts/capture-kids.mjs <<'EOF'
 // Kids Yahoo!「今日は何の日」を対象要素キャプチャ（$x不使用）
 import fs from "node:fs";
 import puppeteer from "puppeteer";
@@ -6,13 +67,11 @@ const URL = "https://kids.yahoo.co.jp/today";
 const OUT = "shots/kids-today.png";
 const VIEWPORT = { width: 1920, height: 1080 };
 
-// ---------- utils ----------
 function ensureDirFor(p){
   const d = p.split("/").slice(0,-1).join("/");
   if (d && !fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 }
 
-// セレクタを上から順に試す
 async function shootElementBySelectors(page, selectors, outPath){
   for (const sel of selectors){
     const el = await page.$(sel);
@@ -25,7 +84,6 @@ async function shootElementBySelectors(page, selectors, outPath){
   return false;
 }
 
-// 見出しテキストに一致するh1/h2/h3を探し、近い親(section→div→main)を撮る
 async function shootByHeadingText(page, headingText, outPath){
   const headings = await page.$$("h1, h2, h3");
   for (const h of headings){
@@ -56,7 +114,6 @@ async function shootByHeadingText(page, headingText, outPath){
   return false;
 }
 
-// ---------- main ----------
 (async () => {
   ensureDirFor(OUT);
 
@@ -74,27 +131,21 @@ async function shootByHeadingText(page, headingText, outPath){
       "AppleWebKit/537.36 (KHTML, like Gecko) " +
       "Chrome/126.0.0.0 Safari/537.36"
     );
-
     await page.goto(URL, { waitUntil: "networkidle2", timeout: 120000 });
     await page.waitForSelector("main", { timeout: 8000 }).catch(()=>{});
 
-    // 1) 代表的なセレクタ
     const ok1 = await shootElementBySelectors(
       page,
       ["main", "main .today", ".todayMain", ".contents main"],
       OUT
     );
-
-    // 2) 見出しから推定
     let ok2 = false;
     if (!ok1) ok2 = await shootByHeadingText(page, "今日は何の日", OUT);
 
-    // 3) フォールバック：全画面
     if (!ok1 && !ok2){
       console.warn("Fallback to full-page capture.");
       await page.screenshot({ path: OUT, fullPage: true });
     }
-
     console.log("Saved:", OUT);
   } catch (e){
     console.error("Capture failed:", e);
@@ -103,3 +154,18 @@ async function shootByHeadingText(page, headingText, outPath){
     await browser.close();
   }
 })();
+EOF
+          echo "=== head of new script ==="
+          sed -n '1,80p' scripts/capture-kids.mjs
+
+      - name: Run capture script
+        run: node scripts/capture-kids.mjs
+
+      - name: Commit & Push outputs (and script if updated)
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add shots/*.png scripts/capture-kids.mjs || true
+          git commit -m "Update kids-today capture (and script if changed) [skip ci]" || echo "No changes to commit"
+          git pull --rebase origin "${GITHUB_REF_NAME:-main}"
+          git push origin HEAD:"${GITHUB_REF_NAME:-main}"
