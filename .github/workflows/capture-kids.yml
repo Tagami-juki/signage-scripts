@@ -34,11 +34,13 @@ jobs:
       - name: Ensure output dir
         run: mkdir -p shots scripts
 
-      # ここで必ず毎回ファイルを作り直す（古い残骸を消す）
-      - name: Generate capture script (mjs, NO MAIN FALLBACK)
+      # ====== ここで毎回 script を生成（NO MAIN FALLBACK）======
+      - name: Generate capture script (NO MAIN FALLBACK)
+        shell: bash
         run: |
-          rm -f scripts/capture-kids.mjs
-          cat > scripts/capture-kids.mjs <<'EOF'
+          set -euo pipefail
+          mkdir -p scripts
+          cat > scripts/capture-kids.mjs <<'__SCRIPT__'
 // SIGNATURE: kids-today v3 NO_MAIN_FALLBACK
 import fs from "node:fs";
 import puppeteer from "puppeteer";
@@ -92,7 +94,7 @@ async function waitAndPick(page){
       "Chrome/126.0.0.0 Safari/537.36"
     );
 
-    // 軽量化（必要なければコメントアウト）
+    // 軽量化（不要なら削除可）
     await page.setRequestInterception(true);
     page.on("request", req => {
       const t = req.resourceType();
@@ -118,17 +120,17 @@ async function waitAndPick(page){
     await browser.close();
   }
 })();
-EOF
+__SCRIPT__
 
-      # 生成したスクリプトの先頭を必ずログ表示
       - name: Show generated script head
         run: |
           echo "=== head of scripts/capture-kids.mjs ==="
           sed -n '1,80p' scripts/capture-kids.mjs
 
-      # スクリプトに 'main' を含んでいたら即エラーにして止める
-      - name: Assert script does NOT contain 'main' as selector candidate
+      - name: Assert script does NOT contain 'main' fallback
+        shell: bash
         run: |
+          # 「Captured by selector: main」などが含まれていたら失敗させる
           if grep -nE "Captured by selector:\s*main|'\s*main\s*'|\"\s*main\s*\"" scripts/capture-kids.mjs; then
             echo "::error ::Found forbidden 'main' fallback in script"
             exit 1
@@ -138,7 +140,9 @@ EOF
         run: node scripts/capture-kids.mjs
 
       - name: Commit & Push outputs (if changed)
+        shell: bash
         run: |
+          set -e
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add shots/kids-today.png
