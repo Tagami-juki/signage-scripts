@@ -1,5 +1,5 @@
 name: Capture Kids Yahoo Today
-//
+
 on:
   workflow_dispatch:
   schedule:
