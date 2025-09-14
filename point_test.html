@@ -1,0 +1,30 @@
+<!doctype html><html lang="ja">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Open-Meteo 単点テスト</title>
+<style>
+  html,body{height:100%;margin:0;background:#0b1220;color:#e6edf3;font-family:system-ui,"Noto Sans JP",sans-serif}
+  pre{white-space:pre-wrap;word-break:break-all;background:#111a2a;padding:12px 14px;border-radius:10px;margin:12px}
+  .t{opacity:.8;margin:12px}
+</style>
+<div class="t">診断時刻: 2025-09-14 18:12:06 JST ／ 千代田区のforecastを直接 fetch</div>
+<pre id="out">loading...</pre>
+<script>
+(async () => {
+  const u = new URL('https://api.open-meteo.com/v1/forecast');
+  Object.assign(u.searchParams, {
+    latitude:35.6812, longitude:139.7671, timezone:'Asia/Tokyo',
+    current:'temperature_2m,weather_code',
+    daily:'temperature_2m_max,temperature_2m_min',
+    forecast_days:1, models:'jma_seamless', _cb:Date.now()
+  });
+  try{
+    const res = await fetch(u, {cache:'no-store'});
+    const ct = res.headers.get('content-type');
+    const text = await res.text();
+    document.getElementById('out').textContent =
+      'status='+res.status+'  ct='+ct+'\nlen='+text.length+'\n\n'+text.slice(0,1000);
+  }catch(e){
+    document.getElementById('out').textContent = 'ERR: '+e.message;
+  }
+})();
+</script>
