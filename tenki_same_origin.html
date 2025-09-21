@@ -1,180 +1,93 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>天気マップ（全国＋北海道インセット）</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>全国天気3分割マップ</title>
 
   <!-- Leaflet -->
-  <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet" crossorigin />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
+  <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
-    html,body { height:100%; margin:0; background:#0b1220; color:#eaeef5;
-      font-family: system-ui, "Segoe UI", Roboto, "Noto Sans JP", sans-serif; }
-    #map { height:100%; }
-    .leaflet-popup-content{ margin:10px 12px; }
-
-    /* インセット（右上） */
-    #inset {
-      position: absolute; right: 14px; top: 14px; width: 360px; height: 240px;
-      border-radius: 10px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.35);
-      border: 1px solid rgba(255,255,255,.15);
-      background: rgba(10,14,26,.35); backdrop-filter: blur(2px);
+    html,body {height:100%; margin:0; background:#0b1220; display:flex;}
+    .panel {flex:1; border-left:1px solid #333; position:relative;}
+    .map {width:100%; height:100%;}
+    .title {
+      position:absolute; left:8px; top:6px; z-index:10; font-weight:800; color:#fff;
+      text-shadow:0 0 3px rgba(0,0,0,.7),0 0 6px rgba(0,0,0,.4);
     }
-    #inset .title {
-      position:absolute; left:10px; top:6px; z-index:10; font-weight:800;
-      text-shadow: 0 0 3px rgba(0,0,0,.7), 0 0 6px rgba(0,0,0,.4);
-    }
-    #inset-map { width:100%; height:100%; }
-
-    /* ラベル（背景マスクなし） */
     .wx-label {
-      font-weight: 700; font-size: 16px; line-height: 1; white-space: nowrap; pointer-events: none;
-      color:#fff; text-shadow: 0 0 2px rgba(0,0,0,.65), 0 0 4px rgba(0,0,0,.35);
+      font-weight:700; font-size:16px; color:#fff; pointer-events:none;
+      text-shadow:0 0 2px rgba(0,0,0,.65),0 0 4px rgba(0,0,0,.35);
     }
-    .pref-label {
-      font-weight: 800; font-size: 18px; line-height: 1; white-space: nowrap; pointer-events: none;
-      color:#fff; text-shadow: 0 0 3px rgba(0,0,0,.7), 0 0 6px rgba(0,0,0,.4);
-    }
-
-    /* フッター */
-    .footer { position:fixed; left:0; right:0; bottom:0;
-      padding:6px 10px; font-size:.8rem; opacity:.85; background:rgba(0,0,0,.25); }
   </style>
 </head>
 <body>
-  <div id="map"></div>
-
-  <!-- 右上：北海道インセット -->
-  <div id="inset">
-    <div class="title">北海道</div>
-    <div id="inset-map"></div>
-  </div>
-
-  <div class="footer">データ: Open-Meteo / 地図: 地理院タイル（出典：国土地理院）</div>
+  <div class="panel"><div class="title">九州・沖縄</div><div id="map-kyushu" class="map"></div></div>
+  <div class="panel"><div class="title">本州</div><div id="map-honshu" class="map"></div></div>
+  <div class="panel"><div class="title">北海道</div><div id="map-hokkaido" class="map"></div></div>
 
   <script>
-    // ===== 都市リスト（pref 付き） =====
     const PLACES = [
-      { id: "kisarazu", name: "木更津市", pref:"千葉県",   lat: 35.3761,  lon: 139.917   },
-      { id: "nagoya",   name: "名古屋市", pref:"愛知県",   lat: 35.18145, lon: 136.90640 },
-      { id: "osaka",    name: "大阪市",   pref:"大阪府",   lat: 34.69374, lon: 135.50217 },
-      { id: "hiroshima",name: "広島市",   pref:"広島県",   lat: 34.39161, lon: 132.45182 },
-      { id: "fukuoka",  name: "福岡市",   pref:"福岡県",   lat: 33.58333, lon: 130.39999 },
-      { id: "morioka",  name: "盛岡市",   pref:"岩手県",   lat: 39.70000, lon: 141.15000 },
-      { id: "hakodate", name: "函館市",   pref:"北海道",   lat: 41.76861, lon: 140.72889 },
-      { id: "niigata",  name: "新潟市",   pref:"新潟県",   lat: 37.91611, lon: 139.03639 },
-      { id: "toyama",   name: "富山市",   pref:"富山県",   lat: 36.69592, lon: 137.21369 },
-      { id: "miyazaki", name: "宮崎市",   pref:"宮崎県",   lat: 31.90778, lon: 131.42028 },
-      { id: "kagoshima",name: "鹿児島市", pref:"鹿児島県", lat: 31.56670, lon: 130.55000 },
-      { id: "chiyoda",  name: "千代田",   pref:"東京都",   lat: 35.69000, lon: 139.76000 },
-      { id: "sendai",   name: "仙台市",   pref:"宮城県",   lat: 38.26884, lon: 140.87194 },
-      // 北海道の追加都市があればここに追記
-      // 例）{ id:"sapporo", name:"札幌市", pref:"北海道", lat:43.06417, lon:141.34694 },
+      // 九州・沖縄
+      { id:"fukuoka", name:"福岡市", pref:"福岡県", lat:33.58333, lon:130.39999 },
+      { id:"miyazaki",name:"宮崎市", pref:"宮崎県", lat:31.90778, lon:131.42028 },
+      { id:"kagoshima",name:"鹿児島市",pref:"鹿児島県",lat:31.56670, lon:130.55000 },
+      // 本州
+      { id:"osaka",   name:"大阪市", pref:"大阪府", lat:34.69374, lon:135.50217 },
+      { id:"nagoya",  name:"名古屋市",pref:"愛知県", lat:35.18145, lon:136.90640 },
+      { id:"hiroshima",name:"広島市", pref:"広島県", lat:34.39161, lon:132.45182 },
+      { id:"niigata", name:"新潟市", pref:"新潟県", lat:37.91611, lon:139.03639 },
+      { id:"toyama",  name:"富山市", pref:"富山県", lat:36.69592, lon:137.21369 },
+      { id:"morioka", name:"盛岡市", pref:"岩手県", lat:39.7, lon:141.15 },
+      { id:"sendai",  name:"仙台市", pref:"宮城県", lat:38.26884, lon:140.87194 },
+      { id:"chiyoda", name:"千代田", pref:"東京都", lat:35.69000, lon:139.76000 },
+      // 北海道
+      { id:"hakodate",name:"函館市", pref:"北海道", lat:41.76861, lon:140.72889 },
+      // 必要に応じて札幌など追加
     ];
 
-    // ===== 共通関数 =====
-    function iconText(text, isPref=false) {
-      return L.divIcon({ className: isPref ? "pref-label" : "wx-label", html: text, iconSize: null, iconAnchor: [0,0] });
+    function iconText(text){
+      return L.divIcon({ className:"wx-label", html:text, iconSize:null, iconAnchor:[0,0] });
     }
-    async function loadJSON(id) {
-      const url = `data/${id}.json?ts=${Date.now()}`;
-      const res = await fetch(url, { cache:"no-store" });
-      if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-      return await res.json();
+    async function loadJSON(id){
+      const res = await fetch(`data/${id}.json?ts=${Date.now()}`,{cache:"no-store"});
+      return res.ok ? res.json() : null;
     }
-    function wcToEmoji(wc) {
-      return ({0:"☀",1:"🌤",2:"⛅",3:"☁",45:"🌫",48:"🌫",51:"🌦",53:"🌦",55:"🌦",61:"🌧",63:"🌧",65:"🌧",71:"🌨",73:"🌨",75:"🌨",95:"⛈",96:"⛈",99:"⛈"})[wc] ?? "⛅";
+    function wcToEmoji(wc){
+      return ({0:"☀",1:"🌤",2:"⛅",3:"☁",61:"🌧",63:"🌧",65:"🌧",71:"🌨",75:"🌨",95:"⛈"})[wc] ?? "⛅";
     }
-    function avgLatLon(points){ return [ points.reduce((s,p)=>s+p[0],0)/points.length, points.reduce((s,p)=>s+p[1],0)/points.length ]; }
 
-    // ===== メインマップ（全国：北海道を除く都道府県サマリ） =====
-    const map = L.map('map', { zoomControl: true });
-    const baseUrl = 'https://cyberjapandata.gsi.go.jp/xyz/relief/{z}/{x}/{y}.png';
-    L.tileLayer(baseUrl, { attribution: '&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>' }).addTo(map);
-
-    // 先に全国をほどよい範囲に
-    const nonHokkaidoCoords = PLACES.filter(p => p.pref !== "北海道").map(p => [p.lat,p.lon]);
-    map.fitBounds(L.latLngBounds(nonHokkaidoCoords), { padding:[20,20] });
-
-    const prefLayer = L.layerGroup().addTo(map);
-    const cityData = new Map();
-
-    async function buildCityData() {
-      cityData.clear();
-      for (const p of PLACES) {
-        try {
-          const j = await loadJSON(p.id);
-          const c = j.current || {};
-          const d = j.daily   || {};
-          const t  = (c.temperature_2m != null) ? Math.round(c.temperature_2m) : null;
-          const wc = (c.weather_code ?? d.weather_code?.[0]);
-          cityData.set(p.id, { place:p, temp:t, wc, updatedAt:j.updatedAt });
-        } catch(e) {
-          cityData.set(p.id, { place:p, temp:null, wc:null, updatedAt:null });
-        }
+    async function build(map, subset){
+      for(const p of subset){
+        const j = await loadJSON(p.id);
+        const t = j?.current?.temperature_2m ? Math.round(j.current.temperature_2m) : null;
+        const wc = j?.current?.weather_code;
+        const label = (t==null)? `${p.name}` : `${wcToEmoji(wc)} ${t}℃`;
+        L.marker([p.lat,p.lon],{icon:iconText(label)}).addTo(map);
       }
+      map.fitBounds(L.latLngBounds(subset.map(p=>[p.lat,p.lon])),{padding:[20,20]});
     }
 
-    function buildPrefSummary(excludePref = null) {
-      prefLayer.clearLayers();
-      // prefecture -> array of records
-      const groups = {};
-      for (const p of PLACES) {
-        if (excludePref && p.pref === excludePref) continue;  // 北海道はメインから除外
-        const rec = cityData.get(p.id);
-        if (!groups[p.pref]) groups[p.pref] = [];
-        groups[p.pref].push(rec || { place:p, temp:null, wc:null });
-      }
-      for (const [pref, arr] of Object.entries(groups)) {
-        const points = arr.map(r => [r.place.lat, r.place.lon]);
-        const [lat,lon] = avgLatLon(points);
-        const temps = arr.map(r => r.temp).filter(v => typeof v === "number");
-        const avgT  = temps.length ? Math.round(temps.reduce((a,b)=>a+b,0)/temps.length) : null;
-        const wc    = (arr.find(r => typeof r.wc === "number")?.wc) ?? null;
-        const emo   = wcToEmoji(wc);
-        const text  = (avgT==null) ? `${pref}` : `${pref} ${emo} ${avgT}℃`;
-        L.marker([lat,lon], { icon: iconText(text, true) })
-         .bindPopup(`<b>${pref}</b><div>登録都市: ${arr.length} 件</div>`)
-         .addTo(prefLayer);
-      }
-    }
+    const base = 'https://cyberjapandata.gsi.go.jp/xyz/relief/{z}/{x}/{y}.png';
+    const opts = { attribution:'&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>' };
 
-    // ===== 北海道インセット（都市ラベル表示） =====
-    const insetMap = L.map('inset-map', { attributionControl:false, zoomControl:false, dragging:false, scrollWheelZoom:false, doubleClickZoom:false, boxZoom:false, keyboard:false });
-    L.tileLayer(baseUrl, { attribution: '' }).addTo(insetMap);
-    const insetLayer = L.layerGroup().addTo(insetMap);
+    // 3マップ作成
+    const mapKyushu = L.map('map-kyushu',{zoomControl:false,attributionControl:false});
+    L.tileLayer(base,opts).addTo(mapKyushu);
+    build(mapKyushu, PLACES.filter(p=>["福岡県","宮崎県","鹿児島県"].includes(p.pref)));
 
-    function buildHokkaidoInset() {
-      insetLayer.clearLayers();
-      const hk = PLACES.filter(p => p.pref === "北海道");
-      if (!hk.length) return;
-      // ビューを北海道にフィット（少し余白多め）
-      insetMap.fitBounds(L.latLngBounds(hk.map(p => [p.lat,p.lon])), { padding:[20,20] });
+    const mapHonshu = L.map('map-honshu',{zoomControl:false,attributionControl:false});
+    L.tileLayer(base,opts).addTo(mapHonshu);
+    build(mapHonshu, PLACES.filter(p=>!["北海道","福岡県","宮崎県","鹿児島県"].includes(p.pref)));
 
-      for (const p of hk) {
-        const rec = cityData.get(p.id);
-        const t = rec?.temp, wc = rec?.wc;
-        const label = (t==null) ? `${p.name}` : `${wcToEmoji(wc)} ${t}℃`;
-        L.marker([p.lat,p.lon], { icon: iconText(label, false) })
-         .bindPopup(`<b>${p.name}（${p.pref}）</b><div>現在 ${t??"-"}℃</div>`)
-         .addTo(insetLayer);
-      }
-    }
+    const mapHokkaido = L.map('map-hokkaido',{zoomControl:false,attributionControl:false});
+    L.tileLayer(base,opts).addTo(mapHokkaido);
+    build(mapHokkaido, PLACES.filter(p=>p.pref==="北海道"));
 
-    // ===== 初期化＆定期更新 =====
-    (async () => {
-      await buildCityData();
-      buildPrefSummary("北海道"); // メインは北海道を除外
-      buildHokkaidoInset();       // インセットに北海道
-    })();
-
-    // 10分ごとに自己リロード（JSON更新を確実反映）
-    setInterval(() => {
-      const base = location.href.split("#")[0].split("?")[0];
-      location.replace(`${base}?v=${Date.now()}`);
-    }, 10 * 60 * 1000);
+    // 10分ごとにリロード
+    setInterval(()=>location.reload(),10*60*1000);
   </script>
 </body>
 </html>
