@@ -37,9 +37,32 @@
       text-shadow:0 0 3px rgba(0,0,0,.7),0 0 6px rgba(0,0,0,.4); letter-spacing:.05em;
     }
     .wx-label{
-      font-weight:700; font-size:16px; color:#fff; pointer-events:none;
-      text-shadow:0 0 2px rgba(0,0,0,.65),0 0 4px rgba(0,0,0,.35);
+  display:inline-flex; align-items:center; gap:6px;
+  font-weight:700; font-size:16px; color:#fff; pointer-events:none;
+  text-shadow:0 0 2px rgba(0,0,0,.65),0 0 4px rgba(0,0,0,.35);
     }
+
+/* お好みで調整：アイコンと温度の倍率 */
+  :root{
+    --emoji-scale: 1.8;   /* ← 天気マークだけ大きく（例: 1.6～2.2 ） */
+    --temp-scale:  1.2;   /* ← 温度の大きさ（例: 1.0～1.4 ） */
+    }
+
+  .wx-label .wx-emoji{            /* 絵文字アイコン用 */
+    font-size: calc(1em * var(--emoji-scale));
+    line-height: 1; filter: drop-shadow(0 0 2px rgba(0,0,0,.45));
+    }
+  .wx-label .wx-temp{
+    font-size: calc(1em * var(--temp-scale));
+    font-weight: 800;
+    }
+
+/* 画像アイコンを使う場合（後述） */
+.wx-emoji-img{
+  width: calc(20px * var(--emoji-scale)); /* 基準サイズはお好みで */
+  height: auto; vertical-align: middle;
+  filter: drop-shadow(0 0 2px rgba(0,0,0,.5));
+}
     .note{
       position:absolute; right:8px; bottom:6px; font-size:.8rem; opacity:.8; color:#cfd6ea;
     }
