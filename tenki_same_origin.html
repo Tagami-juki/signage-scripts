@@ -12,14 +12,9 @@
   <style>
     html,body {height:100%; margin:0; background:#0b1220;}
 
-    /* 幅の比率（左=九州+沖縄 / 中央=本州 / 右=北海道）と、左カラムの縦比率（7:3） */
     :root{
-      --w-left:   0.9;  /* 左カラム 少し狭く */
-      --w-center: 1.2;  /* 本州 少し広く   */
-      --w-right:  0.9;  /* 北海道 少し狭く */
-
-      --h-kyushu:  7;   /* 上：九州の比率  */
-      --h-okinawa: 3;   /* 下：沖縄の比率  */
+      --w-left:   0.9;  --w-center: 1.2;  --w-right: 0.9;
+      --h-kyushu: 7;    --h-okinawa: 3;   /* 左カラム 7:3 */
     }
 
     .wrap {display:flex; height:100vh; width:100vw;}
@@ -29,11 +24,8 @@
     .panel[data-col="center"] { flex: var(--w-center); }
     .panel[data-col="right"]  { flex: var(--w-right); }
 
-    /* 左カラムを上下分割（縦Flexで確実に比率配分） */
-    .panel[data-col="left"] .col-vert{
-      display:flex; flex-direction:column;
-      height:100%; width:100%;
-    }
+    /* 左カラム：縦Flexで上下比率を確実に適用 */
+    .panel[data-col="left"] .col-vert{ display:flex; flex-direction:column; height:100%; width:100%; }
     .subpanel[data-region="kyushu"]  { flex: var(--h-kyushu) 1 0; }
     .subpanel[data-region="okinawa"] { flex: var(--h-okinawa) 1 0; }
 
@@ -52,7 +44,7 @@
       position:absolute; right:8px; bottom:6px; font-size:.8rem; opacity:.8; color:#cfd6ea;
     }
 
-    /* 調整用HUD（?edit=1 のときだけ表示） */
+    /* HUD（?edit=1 のときだけ表示） */
     .hud{
       display:none; position:absolute; right:8px; top:6px; z-index:20;
       background:rgba(0,0,0,.35); color:#fff; padding:6px 8px; border-radius:8px;
@@ -65,8 +57,10 @@
       background:rgba(255,255,255,.1); color:#fff; border-radius:6px; cursor:pointer;
     }
     .is-edit .hud{display:block;}
-    /* 標高タイルをベースに馴染ませる（対応ブラウザで） */
+
+    /* タイルの見た目微調整 */
     .relief-overlay { mix-blend-mode: multiply; }
+    .base-tiles{ filter: brightness(1.05) contrast(0.85) saturate(0.75) opacity(0.95); }
   </style>
 </head>
 <body>
@@ -104,12 +98,12 @@
   <div class="note">地図: 地理院タイル / データ: Open-Meteo</div>
 
   <script>
-  // ===== 基本設定 =====
-  //const TILE = 'https://cyberjapandata.gsi.go.jp/xyz/relief/{z}/{x}/{y}.png';
-  const BASE_TILE   = 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png';   // 単色寄りで県境が見やすい
+  // ===== タイル定義 =====
+  const BASE_TILE   = 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png';   // 淡色地図
   const RELIEF_TILE = 'https://cyberjapandata.gsi.go.jp/xyz/relief/{z}/{x}/{y}.png'; // 色別標高図
-  const RELIEF_OPACITY = 0.45;   // 透過率（お好みで 0.3〜0.6 程度）
+  const RELIEF_OPACITY = 0.45;
   const ATTR = '&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>';
+
   const urlp = new URLSearchParams(location.search);
   const IS_EDIT = urlp.get('edit') === '1';
   if (IS_EDIT) document.body.classList.add('is-edit');
@@ -124,7 +118,7 @@
     hokkaido: { center: [41.76261, 142.96465], zoom: 6 },
   };
 
-  // 保険（自動フィット用：固定を使わない時だけ参照）
+  // 自動フィットの保険（固定を使わない時だけ参照）
   const REGION_BOUNDS = {
     kyushu:   [[30.0, 128.0], [34.5, 132.8]],
     okinawa:  [[24.0, 122.5], [27.8, 129.8]],
@@ -133,29 +127,48 @@
   };
   const REGION_ZOOM_MAX = { kyushu:7, okinawa:10, honshu:6, hokkaido:6 };
 
-  // 都市
+  // ===== 表示地点（新規追加 含む） =====
   const PLACES = [
     // 九州
     { id:"fukuoka",   name:"福岡市",   pref:"福岡県",   lat:33.58333, lon:130.39999 },
+    { id:"kumamoto",  name:"熊本市",   pref:"熊本県",   lat:32.80310, lon:130.70790 },
+    { id:"nagasaki",  name:"長崎市",   pref:"長崎県",   lat:32.75030, lon:129.87770 },
+    { id:"oita",      name:"大分市",   pref:"大分県",   lat:33.23960, lon:131.60930 },
     { id:"miyazaki",  name:"宮崎市",   pref:"宮崎県",   lat:31.90778, lon:131.42028 },
     { id:"kagoshima", name:"鹿児島市", pref:"鹿児島県", lat:31.56670, lon:130.55000 },
+
     // 沖縄
     { id:"naha",      name:"那覇市",   pref:"沖縄県",   lat:26.21240, lon:127.68093 },
+
     // 本州（四国含む）
     { id:"osaka",     name:"大阪市",   pref:"大阪府",   lat:34.69374, lon:135.50217 },
     { id:"nagoya",    name:"名古屋市", pref:"愛知県",   lat:35.18145, lon:136.90640 },
     { id:"hiroshima", name:"広島市",   pref:"広島県",   lat:34.39161, lon:132.45182 },
     { id:"niigata",   name:"新潟市",   pref:"新潟県",   lat:37.91611, lon:139.03639 },
     { id:"toyama",    name:"富山市",   pref:"富山県",   lat:36.69592, lon:137.21369 },
+    { id:"akita",     name:"秋田市",   pref:"秋田県",   lat:39.72000, lon:140.10350 },
+    { id:"yamagata",  name:"山形市",   pref:"山形県",   lat:38.25540, lon:140.33960 },
+    { id:"saitama",   name:"さいたま市", pref:"埼玉県", lat:35.86170, lon:139.64550 },
+    { id:"ishikawa",  name:"金沢市",   pref:"石川県",   lat:36.56130, lon:136.65620 },  // 県代表=金沢
+    { id:"shizuoka",  name:"静岡市",   pref:"静岡県",   lat:34.97560, lon:138.38280 },
+    { id:"okayama",   name:"岡山市",   pref:"岡山県",   lat:34.65500, lon:133.91950 },
+    { id:"yamaguchi", name:"山口市",   pref:"山口県",   lat:34.17830, lon:131.47360 },
+    { id:"fukushima", name:"福島市",   pref:"福島県",   lat:37.76080, lon:140.47470 },
     { id:"morioka",   name:"盛岡市",   pref:"岩手県",   lat:39.70000, lon:141.15000 },
     { id:"sendai",    name:"仙台市",   pref:"宮城県",   lat:38.26884, lon:140.87194 },
     { id:"chiyoda",   name:"千代田",   pref:"東京都",   lat:35.69000, lon:139.76000 },
     { id:"kisarazu",  name:"木更津市", pref:"千葉県",   lat:35.37610, lon:139.91700 },
-    // 北海道（代表）
+
+    // 北海道
     { id:"sapporo",   name:"札幌市",   pref:"北海道",   lat:43.06417, lon:141.34694 },
+    { id:"hakodate",  name:"函館市",   pref:"北海道",   lat:41.76870, lon:140.72880 },
+    { id:"wakkanai",  name:"稚内市",   pref:"北海道",   lat:45.41560, lon:141.67300 },
+    { id:"abashiri",  name:"網走市",   pref:"北海道",   lat:44.02000, lon:144.26970 },
+    { id:"kushiro",   name:"釧路市",   pref:"北海道",   lat:42.98490, lon:144.38190 },
+    { id:"furano",    name:"富良野市", pref:"北海道",   lat:43.34200, lon:142.38300 },
   ];
 
-  // ユーティリティ
+  // ===== ユーティリティ =====
   function iconText(text){ return L.divIcon({ className:"wx-label", html:text, iconSize:null, iconAnchor:[0,0] }); }
   async function loadJSON(id){
     try{
@@ -169,35 +182,25 @@
              61:"🌧",63:"🌧",65:"🌧",71:"🌨",73:"🌨",75:"🌨",95:"⛈",96:"⛈",99:"⛈"})[wc] ?? "⛅";
   }
   function subset(region){
-    if(region==="kyushu")   return PLACES.filter(p => ["福岡県","宮崎県","鹿児島県"].includes(p.pref));
+    if(region==="kyushu")   return PLACES.filter(p => ["福岡県","熊本県","長崎県","大分県","宮崎県","鹿児島県"].includes(p.pref));
     if(region==="okinawa")  return PLACES.filter(p => p.pref==="沖縄県");
     if(region==="hokkaido") return PLACES.filter(p => p.pref==="北海道");
-    return PLACES.filter(p => !["北海道","福岡県","宮崎県","鹿児島県","沖縄県"].includes(p.pref)); // 本州
+    return PLACES.filter(p => !["北海道","福岡県","熊本県","長崎県","大分県","宮崎県","鹿児島県","沖縄県"].includes(p.pref)); // 本州
   }
 
-// マップ生成
+  // ===== マップ生成 =====
   async function buildMap(elId, regionKey){
-  const holder = document.querySelector(`[data-region="${regionKey}"]`) || document.querySelector(`[id="${elId}"]`)?.parentElement;
-  const map = L.map(elId, {
-    zoomControl: IS_EDIT, attributionControl:false,
-    dragging: IS_EDIT, scrollWheelZoom: IS_EDIT, doubleClickZoom: IS_EDIT,
-    touchZoom: IS_EDIT, boxZoom: IS_EDIT, keyboard: IS_EDIT
-  });
+    const holder = document.querySelector(`[data-region="${regionKey}"]`) || document.querySelector(`[id="${elId}"]`)?.parentElement;
+    const map = L.map(elId, {
+      zoomControl: IS_EDIT, attributionControl:false,
+      dragging: IS_EDIT, scrollWheelZoom: IS_EDIT, doubleClickZoom: IS_EDIT,
+      touchZoom: IS_EDIT, boxZoom: IS_EDIT, keyboard: IS_EDIT
+    });
 
-  // ▼▼ ここから 2枚重ね ▼▼
-  // ベース（単色・標準など）
-  L.tileLayer(BASE_TILE, { attribution: ATTR, maxZoom: 18 }).addTo(map);
+    // ベース＋標高オーバーレイ
+    L.tileLayer(BASE_TILE,   { attribution: ATTR, maxZoom: 18, className:'base-tiles' }).addTo(map);
+    L.tileLayer(RELIEF_TILE, { attribution: ATTR, maxZoom: 18, opacity: RELIEF_OPACITY, className:'relief-overlay' }).addTo(map);
 
-  // 標高オーバーレイ（半透明）
-  L.tileLayer(RELIEF_TILE, {
-    attribution: ATTR,
-    maxZoom: 18,
-    opacity: RELIEF_OPACITY,
-    className: 'relief-overlay'  // CSS: .relief-overlay { mix-blend-mode: multiply; }
-  }).addTo(map);
-  // ▲▲ ここまで 2枚重ね ▲▲
-
-    // 固定 or 自動
     if (USE_FIXED_VIEW && PANEL_VIEW[regionKey]){
       map.setView(PANEL_VIEW[regionKey].center, PANEL_VIEW[regionKey].zoom);
     } else {
@@ -237,7 +240,7 @@
     return map;
   }
 
-  // 初期化
+  // ===== 初期化 =====
   window.addEventListener("load", async () => {
     await Promise.all([
       buildMap("map-kyushu",   "kyushu"),
