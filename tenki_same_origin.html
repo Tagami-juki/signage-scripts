@@ -372,8 +372,20 @@ async function buildMap(elId, regionKey){
     dragging: IS_EDIT, scrollWheelZoom: IS_EDIT, doubleClickZoom: IS_EDIT,
     touchZoom: IS_EDIT, boxZoom: IS_EDIT, keyboard: IS_EDIT
   });
-  L.tileLayer(BASE_TILE,   { attribution: ATTR, maxZoom: 18, className:'base-tiles' detectRetina: true }).addTo(map);
-  L.tileLayer(RELIEF_TILE, { attribution: ATTR, maxZoom: 18, opacity: RELIEF_OPACITY, className:'relief-overlay' detectRetina: true }).addTo(map);
+  L.tileLayer(BASE_TILE, {
+    attribution: ATTR,
+    maxZoom: 18,
+    className:'base-tiles'
+    detectRetina: true
+  }).addTo(map);
+  
+  L.tileLayer(RELIEF_TILE,{
+  attribution: ATTR,
+  maxZoom: 18,
+  opacity: RELIEF_OPACITY,
+  className:'relief-overlay' ,
+  detectRetina: true
+  }).addTo(map);
 
   if (USE_FIXED_VIEW && PANEL_VIEW[regionKey]){
     map.setView(PANEL_VIEW[regionKey].center, PANEL_VIEW[regionKey].zoom);
