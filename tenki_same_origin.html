@@ -446,8 +446,8 @@ window.addEventListener("load", async () => {
 
   // ティッカーは “待たない・落とさない”
   if (typeof loadKantoTicker === "function") {
-    loadKantoTicker()
-      .catch(() => setTickerText?.("【関東の天気概況】 データ準備中…"));
+    try { await loadKantoTicker(); }
+    catch { setTickerText("【関東の天気概況】 データ準備中…"); }
   }
 
   // 概況ティッカー
