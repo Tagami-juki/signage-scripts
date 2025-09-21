@@ -1,4 +1,6 @@
 name: Fetch Open-Meteo JSON
+permissions:
+  contents: write        # ★ 追加（全体 or jobs.fetch 下でも可）
 
 on:
   workflow_dispatch:
