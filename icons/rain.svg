@@ -1,0 +1,21 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gCloud" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#CFD8DC"></stop><stop offset="100%" stop-color="#90A4AE"></stop>
+    </linearGradient>
+    <linearGradient id="gDrop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4FC3F7"></stop><stop offset="100%" stop-color="#01579B"></stop>
+    </linearGradient>
+  </defs>
+  <g fill="url(#gCloud)" stroke="#222" stroke-width="2">
+    <ellipse cx="40" cy="30" rx="16" ry="12"></ellipse>
+    <ellipse cx="24" cy="32" rx="12" ry="10"></ellipse>
+    <rect x="16" y="32" width="36" height="14" rx="7"></rect>
+  </g>
+  <g fill="url(#gDrop)" stroke="#222" stroke-width="1">
+    <path d="M20 52c2-4 4-6 4-8a3 3 0 0 0-6 0c0 2 2 4 2 8z"></path>
+    <path d="M30 58c2-4 4-6 4-8a3 3 0 0 0-6 0c0 2 2 4 2 8z"></path>
+    <path d="M40 52c2-4 4-6 4-8a3 3 0 0 0-6 0c0 2 2 4 2 8z"></path>
+    <path d="M50 58c2-4 4-6 4-8a3 3 0 0 0-6 0c0 2 2 4 2 8z"></path>
+  </g>
+</svg>
