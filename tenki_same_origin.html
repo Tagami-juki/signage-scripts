@@ -242,18 +242,31 @@
   ];
 
   // === アイコン設定（絵文字を大きく / 画像に差し替え可） ===
-  const USE_IMAGE_ICONS = false;       // 画像アイコンを使うなら true
+  const USE_IMAGE_ICONS = true;       // 画像アイコンを使うなら true
   const ICON_BASE = "icons";           // icons/clear.svg などを配置
 
-  function codeToName(wc){
-    if ([0].includes(wc)) return "clear";
-    if ([1,2].includes(wc)) return "partly";
-    if ([3].includes(wc))  return "cloudy";
-    if ([45,48].includes(wc)) return "fog";
-    if ([51,53,55,61,63,65].includes(wc)) return "rain";
-    if ([71,73,75].includes(wc)) return "snow";
-    if ([95,96,99].includes(wc)) return "thunder";
-    return "partly";
+function codeToName(wc){
+  // WMO → 12分類
+  if (wc === 0) return "clear";                     // 快晴
+  if (wc === 1) return "mostly_clear";              // 晴れ（少し雲）
+  if (wc === 2) return "partly";                    // 晴れ時々くもり
+  if (wc === 3) return "overcast";                  // くもり（鉛色）
+
+  if (wc === 45 || wc === 48) return "fog";        // 霧・着氷性霧
+
+  if ([51,53,55,56,57].includes(wc)) return "drizzle"; // 霧雨/着氷性霧雨
+
+  if ([61,80].includes(wc)) return "rain_light";   // 弱い雨/にわか雨(弱)
+  if ([63,66,81].includes(wc)) return "rain";      // 雨/着氷性雨/にわか雨
+  if ([65,67,82].includes(wc)) return "rain_heavy";// 強い雨/にわか雨(強)
+
+  if ([71,77,85].includes(wc)) return "snow_light";// 弱い雪/雪あられ/にわか雪(弱)
+  if ([73,86].includes(wc))   return "snow";       // 雪/にわか雪
+  if (wc === 75)              return "snow_heavy"; // 強い雪
+
+  if ([95,96,99].includes(wc)) return "thunder";   // 雷（ひょう含む）
+
+  return "partly"; // フォールバック
   }
   function iconTagFor(wc){
     if (USE_IMAGE_ICONS){
