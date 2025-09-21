@@ -94,8 +94,14 @@
 
     /* 天気ラベル（アイコン大、温度は別サイズ） */
     .wx-label{
-      display:inline-flex; align-items:center; gap:6px;
-      font-weight:700; font-size:16px; color:#fff; pointer-events:none;
+      display:inline-flex;
+      flex-direction: column;
+      align-items:center; 
+      gap:4px;
+      font-weight:700;
+      font-size:16px;
+      color:#fff;
+      pointer-events:none;
       text-shadow:0 0 2px rgba(0,0,0,.65),0 0 4px rgba(0,0,0,.35);
     }
     .wx-label .wx-emoji{
