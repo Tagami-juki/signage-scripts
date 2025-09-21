@@ -40,11 +40,16 @@
     }
     .is-edit .hud {display:block;}
     /* 追加：幅の比率（お好みで数字を調整） */
-:root{
-  --w-kyushu: 0.9;   /* 少し狭く */
-  --w-honshu: 1.2;   /* 少し広く */
-  --w-hokkaido: 0.9; /* 少し狭く */
+  :root{
+    --w-kyushu: 0.9;   /* 少し狭く */
+    --w-honshu: 1.2;   /* 少し広く */
+    --w-hokkaido: 0.9; /* 少し狭く */
     }
+    /* 既存 .panel はそのままでもOK。指定があれば上書きします */
+    .panel[data-region="kyushu"]   { flex: var(--w-kyushu); }
+    .panel[data-region="honshu"]   { flex: var(--w-honshu); }
+    .panel[data-region="hokkaido"] { flex: var(--w-hokkaido); }
+      
   </style>
 </head>
 <body>
