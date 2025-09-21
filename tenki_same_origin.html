@@ -1,0 +1,77 @@
+<!doctype html><html lang="ja"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>天気マップ（同一オリジン）</title>
+<link rel="preconnect" href="https://{s}.gsi.go.jp">
+<style>
+  html,body,#map{height:100%;margin:0;background:#0b1220;color:#eaeef5;font-family:system-ui,Segoe UI,Roboto,"Noto Sans JP",sans-serif}
+  .leaflet-popup-content{margin:10px 12px}
+  .card{line-height:1.4}
+  .mini{opacity:.8;font-size:.85rem}
+  .footer{position:fixed;left:0;right:0;bottom:0;padding:6px 10px;font-size:.8rem;opacity:.8;background:rgba(0,0,0,.25)}
+</style>
+<div id="map"></div>
+<div class="footer">データ: Open-Meteo / 地図: 地理院タイル（出典：国土地理院）</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
+<link  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet" crossorigin>
+
+<script>
+const PLACES = [
+  { id:"chiyoda", name:"千代田", lat:35.69, lon:139.76 },
+  { id:"narita",  name:"成田",   lat:35.77, lon:140.39 },
+  { id:"sendai",  name:"仙台",   lat:38.27, lon:140.87 },
+];
+
+const map = L.map('map',{zoomControl:false}).setView([36.2,139.7],6);
+L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{
+  attribution:'&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>'
+}).addTo(map);
+
+const markers = L.layerGroup().addTo(map);
+
+function iconHtml(t){return L.divIcon({
+  className:"wx", iconSize:[80,28], html:`<div style="background:#1a2440;border:1px solid #2a3a66;border-radius:6px;padding:4px 8px;">
+    <b style="font-size:1rem">${t}</b></div>`
+});}
+
+async function loadJSON(id){
+  const url = `data/${id}.json?ts=${Date.now()}`;
+  const res = await fetch(url, { cache:"no-store" });
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+  return await res.json();
+}
+
+function wcToEmoji(wc){
+  // 簡易：必要なら後で詳細化
+  return {0:"☀",1:"🌤",2:"⛅",3:"☁",45:"🌫",48:"🌫",51:"🌦",61:"🌧",71:"🌨"}[wc] || "⛅";
+}
+
+async function render(){
+  markers.clearLayers();
+  for (const p of PLACES){
+    try{
+      const j = await loadJSON(p.id);
+      const c = j.current || {};
+      const d = j.daily   || {};
+      const t  = (c.temperature_2m!=null) ? Math.round(c.temperature_2m) : "-";
+      const tH = (d.temperature_2m_max?.[0]!=null) ? Math.round(d.temperature_2m_max[0]) : "-";
+      const tL = (d.temperature_2m_min?.[0]!=null) ? Math.round(d.temperature_2m_min[0]) : "-";
+      const emo= wcToEmoji(c.weather_code ?? d.weather_code?.[0]);
+
+      const m = L.marker([p.lat,p.lon],{icon:iconHtml(`${emo} ${t}℃`)}).addTo(markers);
+      const upd = j.updatedAt ? new Date(j.updatedAt).toLocaleString("ja-JP") : "";
+      m.bindPopup(`<div class="card">
+        <div><b>${p.name}</b></div>
+        <div>現在 ${t}℃ / ↑${tH}℃ / ↓${tL}℃</div>
+        <div class="mini">最終更新: ${upd}</div>
+      </div>`);
+    }catch(e){
+      const m = L.marker([p.lat,p.lon],{icon:iconHtml("N/A")}).addTo(markers);
+      m.bindPopup(`<div class="card"><b>${p.name}</b><div>JSON読み込み失敗</div><div class="mini">${String(e).slice(0,80)}</div></div>`);
+    }
+  }
+}
+render();
+
+// 10分ごとに全体更新（Yodeckの自動再読込に加えて保険）
+setInterval(()=>location.replace(location.href.split("#")[0]+`?v=${Date.now()}`), 10*60*1000);
+</script>
