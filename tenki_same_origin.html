@@ -87,7 +87,7 @@
   .wx-label .wx-emoji{ font-size: calc(1em * var(--emoji-scale)); line-height:1; filter: drop-shadow(0 0 2px rgba(0,0,0,.45)); }
   .wx-label .wx-temp{
     font-size: calc(1em * var(--temp-scale)); font-weight: 800; color:#fff;
-    -webkit-text-stroke: 0 /*var(--temp-stroke) var(--temp-stroke-color); */
+    -webkit-text-stroke: 0; /*var(--temp-stroke) var(--temp-stroke-color); */
     text-shadow: 0 0 3px rgba(0,0,0,.35), 0 1px 6px rgba(0,0,0,.25);
   }
   .wx-emoji-img{ width: calc(20px * var(--emoji-scale)); height:auto; vertical-align: middle;
@@ -375,7 +375,7 @@ async function buildMap(elId, regionKey){
   L.tileLayer(BASE_TILE, {
     attribution: ATTR,
     maxZoom: 18,
-    className:'base-tiles'
+    className:'base-tiles',
     detectRetina: true
   }).addTo(map);
   
@@ -434,7 +434,7 @@ async function buildMap(elId, regionKey){
 }
 
 /* ===== 初期化 ===== */
-window.addEventListener("load", () => {
+window.addEventListener("load", async () => {
     // どれか1面で失敗しても他は出す
   const safeBuild = (id, key) => buildMap(id, key).catch(err => console.error('map error', key, err));
   safeBuild("map-kyushu","kyushu");
