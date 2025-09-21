@@ -422,12 +422,19 @@ async function buildMap(elId, regionKey){
 }
 
 /* ===== 初期化 ===== */
-window.addEventListener("load", async () => {
-  await Promise.all([
-    buildMap("map-kyushu",   "kyushu"),
-    buildMap("map-okinawa",  "okinawa"),
-    buildMap("map-honshu",   "honshu"),
-    buildMap("map-hokkaido", "hokkaido"),
+window.addEventListener("load", () => {
+    // どれか1面で失敗しても他は出す
+  const safeBuild = (id, key) => buildMap(id, key).catch(err => console.error('map error', key, err));
+  safeBuild("map-kyushu","kyushu");
+  safeBuild("map-okinawa","okinawa");
+  safeBuild("map-honshu","honshu");
+  safeBuild("map-hokkaido","hokkaido");
+
+  // ティッカーは “待たない・落とさない”
+  if (typeof loadKantoTicker === "function") {
+    loadKantoTicker()
+      .catch(() => setTickerText?.("【関東の天気概況】 データ準備中…"));
+  }
   ]);
 
   // 概況ティッカー
