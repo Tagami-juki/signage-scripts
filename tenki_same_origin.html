@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>天気マップ（同一オリジン / 背景マスクなし・クラスタ対応）</title>
+  <title>天気マップ（同一オリジン / 都道府県クラスタ表示）</title>
 
   <!-- Leaflet -->
   <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet" crossorigin />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
 
-  <!-- MarkerCluster -->
+  <!-- MarkerCluster（都市表示時の重なり回避用） -->
   <link href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" rel="stylesheet" />
   <link href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" rel="stylesheet" />
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
@@ -20,18 +20,19 @@
     .leaflet-popup-content { margin: 10px 12px; }
     .footer { position: fixed; left: 0; right: 0; bottom: 0;
       padding: 6px 10px; font-size: .8rem; opacity: .85; background: rgba(0,0,0,.25); }
-    /* 背景マスクなし・サイズ統一のラベル */
+
+    /* 背景マスクなしのラベル（都市用） */
     .wx-label {
       font-weight: 700; font-size: 16px; line-height: 1; white-space: nowrap; pointer-events: none;
       color: #ffffff;
-      /* 控えめな縁取りだけで視認性を確保 */
-      text-shadow:
-        0 0 2px rgba(0,0,0,.65),
-        0 0 4px rgba(0,0,0,.35);
+      text-shadow: 0 0 2px rgba(0,0,0,.65), 0 0 4px rgba(0,0,0,.35);
     }
-    /* タッチ端末でスクロール優先にしたい場合は下を有効化
-    .leaflet-container { touch-action: pan-x pan-y; }
-    */
+    /* 都道府県まとめラベル（少し大きめ） */
+    .pref-label {
+      font-weight: 800; font-size: 18px; line-height: 1; white-space: nowrap; pointer-events: none;
+      color: #ffffff;
+      text-shadow: 0 0 3px rgba(0,0,0,.7), 0 0 6px rgba(0,0,0,.4);
+    }
   </style>
 </head>
 <body>
@@ -39,58 +40,60 @@
   <div class="footer">データ: Open-Meteo / 地図: 地理院タイル（出典：国土地理院）</div>
 
   <script>
-    // === 表示する地点（Narita → Kisarazu に差し替え + 追加都市） ===
+    // ===== 都市リスト（pref を付与） =====
     const PLACES = [
-      { id: "kisarazu", name: "木更津市", lat: 35.3761,  lon: 139.917   },
-      { id: "nagoya",   name: "名古屋市", lat: 35.18145, lon: 136.90640 },
-      { id: "osaka",    name: "大阪市",   lat: 34.69374, lon: 135.50217 },
-      { id: "hiroshima",name: "広島市",   lat: 34.39161, lon: 132.45182 },
-      { id: "fukuoka",  name: "福岡市",   lat: 33.58333, lon: 130.39999 },
-      { id: "morioka",  name: "盛岡市",   lat: 39.70000, lon: 141.15000 },
-      { id: "hakodate", name: "函館市",   lat: 41.76861, lon: 140.72889 },
-      { id: "niigata",  name: "新潟市",   lat: 37.91611, lon: 139.03639 },
-      { id: "toyama",   name: "富山市",   lat: 36.69592, lon: 137.21369 },
-      { id: "miyazaki", name: "宮崎市",   lat: 31.90778, lon: 131.42028 },
-      { id: "kagoshima",name: "鹿児島市", lat: 31.56670, lon: 130.55000 },
-      // 既存分（例）
-      { id: "chiyoda",  name: "千代田",   lat: 35.69000, lon: 139.76000 },
-      { id: "sendai",   name: "仙台市",   lat: 38.26884, lon: 140.87194 },
+      { id: "kisarazu", name: "木更津市", pref:"千葉県",   lat: 35.3761,  lon: 139.917   },
+      { id: "nagoya",   name: "名古屋市", pref:"愛知県",   lat: 35.18145, lon: 136.90640 },
+      { id: "osaka",    name: "大阪市",   pref:"大阪府",   lat: 34.69374, lon: 135.50217 },
+      { id: "hiroshima",name: "広島市",   pref:"広島県",   lat: 34.39161, lon: 132.45182 },
+      { id: "fukuoka",  name: "福岡市",   pref:"福岡県",   lat: 33.58333, lon: 130.39999 },
+      { id: "morioka",  name: "盛岡市",   pref:"岩手県",   lat: 39.70000, lon: 141.15000 },
+      { id: "hakodate", name: "函館市",   pref:"北海道",   lat: 41.76861, lon: 140.72889 },
+      { id: "niigata",  name: "新潟市",   pref:"新潟県",   lat: 37.91611, lon: 139.03639 },
+      { id: "toyama",   name: "富山市",   pref:"富山県",   lat: 36.69592, lon: 137.21369 },
+      { id: "miyazaki", name: "宮崎市",   pref:"宮崎県",   lat: 31.90778, lon: 131.42028 },
+      { id: "kagoshima",name: "鹿児島市", pref:"鹿児島県", lat: 31.56670, lon: 130.55000 },
+      // 既存分
+      { id: "chiyoda",  name: "千代田",   pref:"東京都",   lat: 35.69000, lon: 139.76000 },
+      { id: "sendai",   name: "仙台市",   pref:"宮城県",   lat: 38.26884, lon: 140.87194 },
     ];
 
-    // === 地図初期化 ===
+    // ===== 地図初期化 =====
     const map = L.map('map', { zoomControl: true }).setView([36.2, 139.7], 6);
-    L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
+    L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/relief/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>'
     }).addTo(map);
 
-    // === クラスタレイヤ ===
-    const cluster = L.markerClusterGroup({
+    // 都市マーカー用（重なり回避）
+    const cityCluster = L.markerClusterGroup({
       showCoverageOnHover: false,
       spiderfyOnMaxZoom: true,
-      disableClusteringAtZoom: 8, // 8以上で個別表示
-      maxClusterRadius: 55        // 重なりが強い場合は数値を大きく
-    });
-    map.addLayer(cluster);
+      disableClusteringAtZoom: 8,
+      maxClusterRadius: 55
+    }).addTo(map);
 
-    // === 背景なしのテキストラベル ===
-    function iconText(text) {
+    // 都道府県まとめ表示用
+    const prefLayer = L.layerGroup().addTo(map);
+
+    // ===== 背景なしのラベル =====
+    function iconText(text, isPref=false) {
       return L.divIcon({
-        className: "wx-label",
-        html: text,      // 例: "☀ 28℃"
-        iconSize: null,  // テキスト幅にフィット
-        iconAnchor: [0, 0] // 左上基準（重なりを少し回避）
+        className: isPref ? "pref-label" : "wx-label",
+        html: text,
+        iconSize: null,
+        iconAnchor: [0, 0]
       });
     }
 
-    // === JSON ローダ ===
+    // ===== JSON ローダ =====
     async function loadJSON(id) {
-      const url = `data/${id}.json?ts=${Date.now()}`; // キャッシュ回避
+      const url = `data/${id}.json?ts=${Date.now()}`;
       const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
       return await res.json();
     }
 
-    // === 天気コード → 絵文字（簡易） ===
+    // 天気コード → 絵文字（簡易）
     function wcToEmoji(wc) {
       return ({
         0:"☀",1:"🌤",2:"⛅",3:"☁",
@@ -101,47 +104,106 @@
       })[wc] ?? "⛅";
     }
 
-    // === 描画 ===
-    async function render() {
-      cluster.clearLayers();
-
+    // ===== データ読込＆都市マーカー描画 =====
+    const cityData = new Map(); // id -> {place, current, daily, updatedAt}
+    async function buildCityMarkers() {
+      cityCluster.clearLayers();
+      cityData.clear();
       for (const p of PLACES) {
         try {
           const j = await loadJSON(p.id);
           const c = j.current || {};
           const d = j.daily   || {};
-          const t  = (c.temperature_2m != null) ? Math.round(c.temperature_2m) : "-";
-          const tH = (d.temperature_2m_max?.[0] != null) ? Math.round(d.temperature_2m_max[0]) : "-";
-          const tL = (d.temperature_2m_min?.[0] != null) ? Math.round(d.temperature_2m_min[0]) : "-";
-          const emo= wcToEmoji(c.weather_code ?? d.weather_code?.[0]);
-
-          const m = L.marker([p.lat, p.lon], { icon: iconText(`${emo} ${t}℃`) });
+          const t  = (c.temperature_2m != null) ? Math.round(c.temperature_2m) : null;
+          const tH = (d.temperature_2m_max?.[0] != null) ? Math.round(d.temperature_2m_max[0]) : null;
+          const tL = (d.temperature_2m_min?.[0] != null) ? Math.round(d.temperature_2m_min[0]) : null;
+          const wc = (c.weather_code ?? d.weather_code?.[0]);
+          const emo= wcToEmoji(wc);
+          const label = (t==null) ? "N/A" : `${emo} ${t}℃`;
+          const m = L.marker([p.lat,p.lon], { icon: iconText(label, false) });
           const upd = j.updatedAt ? new Date(j.updatedAt).toLocaleString("ja-JP") : "";
           m.bindPopup(`
             <div style="line-height:1.4">
-              <div><b>${p.name}</b></div>
-              <div>現在 ${t}℃ / ↑${tH}℃ / ↓${tL}℃</div>
+              <div><b>${p.name}（${p.pref}）</b></div>
+              <div>現在 ${t??"-"}℃ / ↑${tH??"-"}℃ / ↓${tL??"-"}℃</div>
               <div style="opacity:.8">最終更新: ${upd}</div>
             </div>
           `);
-          cluster.addLayer(m);
+          cityCluster.addLayer(m);
+          cityData.set(p.id, { place:p, current:c, daily:d, temp:t, wc, updatedAt:j.updatedAt });
         } catch (e) {
-          const m = L.marker([p.lat, p.lon], { icon: iconText("N/A") });
+          const m = L.marker([p.lat,p.lon], { icon: iconText("N/A", false) });
           m.bindPopup(`
             <div style="line-height:1.4">
-              <div><b>${p.name}</b></div>
+              <div><b>${p.name}（${p.pref}）</b></div>
               <div>JSON読み込み失敗</div>
-              <div style="opacity:.8">${String(e).slice(0, 100)}</div>
+              <div style="opacity:.8">${String(e).slice(0,100)}</div>
             </div>
           `);
-          cluster.addLayer(m);
+          cityCluster.addLayer(m);
         }
       }
     }
 
-    render();
+    // ===== 都道府県まとめ（平均気温＆代表天気）を描画 =====
+    function buildPrefLayer() {
+      prefLayer.clearLayers();
+      // prefecture -> array of city records
+      const groups = {};
+      for (const p of PLACES) {
+        const rec = cityData.get(p.id);
+        if (!groups[p.pref]) groups[p.pref] = [];
+        if (rec) groups[p.pref].push(rec);
+        else groups[p.pref].push({ place:p, temp:null, wc:null }); // JSON失敗でも座標だけ加える
+      }
+      // 各都道府県の中心座標（含まれる都市の平均）＋平均気温
+      for (const [pref, arr] of Object.entries(groups)) {
+        const coords = arr.map(r => [r.place.lat, r.place.lon]);
+        const [lat, lon] = averageLatLon(coords);
+        const temps = arr.map(r => r.temp).filter(v => typeof v === "number");
+        const avgT  = temps.length ? Math.round(temps.reduce((a,b)=>a+b,0)/temps.length) : null;
+        // 代表天気：最初に有効なコードを採用（簡易）
+        const wc    = (arr.find(r => typeof r.wc === "number")?.wc) ?? null;
+        const emo   = wcToEmoji(wc);
 
-    // 10分ごとに自己リロード（Yodeck側の更新設定に加えて保険）
+        const text  = (avgT==null) ? `${pref}` : `${pref} ${emo} ${avgT}℃`;
+        const m = L.marker([lat, lon], { icon: iconText(text, true) });
+        m.bindPopup(`<b>${pref}</b><div>登録都市: ${arr.length} 件</div>`);
+        prefLayer.addLayer(m);
+      }
+    }
+
+    function averageLatLon(points){
+      // 経度の平均は単純平均でOK（日本国内の範囲なら問題なし）
+      const lat = points.reduce((s,p)=>s+p[0],0)/points.length;
+      const lon = points.reduce((s,p)=>s+p[1],0)/points.length;
+      return [lat, lon];
+    }
+
+    // ===== 表示切替（ズーム閾値：全国=都道府県 / 近景=都市） =====
+    const THRESH = 7; // 7未満→都道府県まとめ、7以上→都市
+    function applyVisibilityByZoom() {
+      const z = map.getZoom();
+      if (z < THRESH) {
+        map.addLayer(prefLayer);
+        map.removeLayer(cityCluster);
+      } else {
+        map.addLayer(cityCluster);
+        map.removeLayer(prefLayer);
+      }
+    }
+
+    // 初期描画
+    (async () => {
+      await buildCityMarkers();   // 都市データ読込＆都市レイヤ作成
+      buildPrefLayer();           // 都道府県まとめレイヤ作成
+      applyVisibilityByZoom();    // ズームに応じて切替
+    })();
+
+    // ズーム変更で切替
+    map.on('zoomend', applyVisibilityByZoom);
+
+    // 10分ごとに自己リロード（JSON更新の反映）
     setInterval(() => {
       const base = location.href.split("#")[0].split("?")[0];
       location.replace(`${base}?v=${Date.now()}`);
