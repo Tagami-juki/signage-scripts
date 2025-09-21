@@ -184,6 +184,15 @@
       touchZoom: IS_EDIT, boxZoom: IS_EDIT, keyboard: IS_EDIT
     });
     L.tileLayer(TILE, { attribution: ATTR, maxZoom: 18 }).addTo(map);
+    // ベース（単色寄り／標準地図など）
+    L.tileLayer(BASE_TILE, { attribution: ATTR, maxZoom: 18 }).addTo(map);
+    // 標高オーバーレイ（半透明）
+    L.tileLayer(RELIEF_TILE, {
+    attribution: ATTR,
+    maxZoom: 18,
+    opacity: RELIEF_OPACITY,
+    className: 'relief-overlay' // ← CSSで mix-blend-mode 指定済み
+    }).addTo(map);
 
     // 固定 or 自動
     if (USE_FIXED_VIEW && PANEL_VIEW[regionKey]){
