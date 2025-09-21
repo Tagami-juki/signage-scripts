@@ -176,7 +176,7 @@
   }
 
 // マップ生成
-async function buildMap(elId, regionKey){
+  async function buildMap(elId, regionKey){
   const holder = document.querySelector(`[data-region="${regionKey}"]`) || document.querySelector(`[id="${elId}"]`)?.parentElement;
   const map = L.map(elId, {
     zoomControl: IS_EDIT, attributionControl:false,
@@ -184,16 +184,18 @@ async function buildMap(elId, regionKey){
     touchZoom: IS_EDIT, boxZoom: IS_EDIT, keyboard: IS_EDIT
   });
 
-  // ✅ ベース（単色系／標準地図など）
+  // ▼▼ ここから 2枚重ね ▼▼
+  // ベース（単色・標準など）
   L.tileLayer(BASE_TILE, { attribution: ATTR, maxZoom: 18 }).addTo(map);
 
-  // ✅ 標高オーバーレイ（半透明）
+  // 標高オーバーレイ（半透明）
   L.tileLayer(RELIEF_TILE, {
     attribution: ATTR,
     maxZoom: 18,
     opacity: RELIEF_OPACITY,
-    className: 'relief-overlay' // CSSで mix-blend-mode: multiply;
+    className: 'relief-overlay'  // CSS: .relief-overlay { mix-blend-mode: multiply; }
   }).addTo(map);
+  // ▲▲ ここまで 2枚重ね ▲▲
 
     // 固定 or 自動
     if (USE_FIXED_VIEW && PANEL_VIEW[regionKey]){
