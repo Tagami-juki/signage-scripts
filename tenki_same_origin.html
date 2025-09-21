@@ -108,9 +108,13 @@
       font-size: calc(1em * var(--emoji-scale));
       line-height: 1; filter: drop-shadow(0 0 2px rgba(0,0,0,.45));
     }
+      --temp-stroke: 4px;/* 縁取りの太さ: 1080pなら2〜4px, 4Kなら4〜6px目安 */
+      --temp-stroke-color: rgba(0,0,0,.9);/* 縁取り色 */
     .wx-label .wx-temp{
       font-size: calc(1em * var(--temp-scale));
       font-weight: 800;
+      -webkit-text-stroke: var(--temp-stroke) var(--temp-stroke-color);
+      paint-order: stroke fill;   /* 先にストローク、その後に塗り（白） */
     }
     .wx-emoji-img{
       width: calc(20px * var(--emoji-scale)); height:auto; vertical-align: middle;
