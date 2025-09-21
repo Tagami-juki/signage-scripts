@@ -186,6 +186,36 @@
     { id:"furano",    name:"富良野市", pref:"北海道",   lat:43.34200, lon:142.38300 },
   ];
 
+    // === アイコン表示設定（絵文字を大きく / 画像アイコンに差し替え可） ===
+const USE_IMAGE_ICONS = false;   // 画像アイコンを使うなら true
+const ICON_BASE = "icons";       // 画像を置くフォルダ（icons/clear.svg など）
+
+function codeToName(wc){
+  if ([0].includes(wc)) return "clear";
+  if ([1,2].includes(wc)) return "partly";
+  if ([3].includes(wc))  return "cloudy";
+  if ([45,48].includes(wc)) return "fog";
+  if ([51,53,55,61,63,65].includes(wc)) return "rain";
+  if ([71,73,75].includes(wc)) return "snow";
+  if ([95,96,99].includes(wc)) return "thunder";
+  return "partly";
+}
+function iconTagFor(wc){
+  if (USE_IMAGE_ICONS){
+    const name = codeToName(wc);
+    return `<img class="wx-emoji-img" src="${ICON_BASE}/${name}.svg" alt="">`;
+  }
+  return `<span class="wx-emoji">${wcToEmoji(wc)}</span>`;
+}
+function labelHTML(wc, temp){
+  const icon = iconTagFor(wc);
+  const t = (typeof temp === "number") ? `<span class="wx-temp">${Math.round(temp)}℃</span>` : "";
+  return `${icon}${t}`;
+}
+function makeDivIcon(html){
+  return L.divIcon({ className:"wx-label", html, iconSize:null, iconAnchor:[0,0] });
+}
+
   // ===== ユーティリティ =====
   function iconText(text){ return L.divIcon({ className:"wx-label", html:text, iconSize:null, iconAnchor:[0,0] }); }
   async function loadJSON(id){
