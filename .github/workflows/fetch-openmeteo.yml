@@ -1,22 +1,62 @@
 name: Fetch Open-Meteo JSON
+
 on:
-  schedule: [ { cron: "*/15 * * * *" } ]   # 15分ごと
+  schedule:
+    - cron: "*/15 * * * *"   # 15分ごと
   workflow_dispatch:
+
+# 並行実行で競合しないように
+concurrency:
+  group: fetch-openmeteo-json
+  cancel-in-progress: false
+
 permissions:
-  contents: write                           # ← これが超重要（コミット権限）
+  contents: write
+
 jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: "22" }
-      - name: Fetch Open-Meteo and write JSONs
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0              # ← pull/rebase するので履歴を全部取る
+          persist-credentials: true   # ← push 用トークンを維持
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run fetch script
         run: node scripts/fetch-openmeteo.js
-      - name: Commit & Push
+
+      - name: Commit changes (if any)
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/*.json
-          git commit -m "chore(data): update open-meteo JSON [skip ci]" || echo "nothing to commit"
-          git push
+          git add data/*.json || true
+          # 変更が無いときは commit しない
+          git diff --cached --quiet && echo "No changes to commit." && exit 0
+          git commit -m "chore(data): update open-meteo JSON [skip ci]"
+
+      - name: Pull (rebase) then push with retry
+        run: |
+          # どのブランチにいるかを安全に取得
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}}"
+          git fetch origin "$BRANCH"
+          # リベースで履歴を直線化（競合が起きたら中断）
+          git pull --rebase origin "$BRANCH" || {
+            echo "Rebase failed (likely conflict). Aborting rebase and exiting."
+            git rebase --abort || true
+            exit 1
+          }
+          # リトライ付き push（稀な競合を吸収）
+          for i in 1 2 3; do
+            git push origin HEAD:"$BRANCH" && exit 0
+            echo "Push failed. Retrying in $((i*3))s..."
+            sleep $((i*3))
+            git fetch origin "$BRANCH"
+            git pull --rebase origin "$BRANCH" || true
+          done
+          echo "Push failed after retries." && exit 1
