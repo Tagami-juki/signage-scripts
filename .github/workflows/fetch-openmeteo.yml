@@ -3,7 +3,7 @@ name: Fetch Open-Meteo JSON
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "*/15 * * * *"
 
 jobs:
   fetch:
@@ -11,23 +11,25 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Use Node.js
+      - name: Use Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-
-      - name: Install (none)
+          check-latest: true
 
       - name: Run fetch script
         run: node scripts/fetch-openmeteo.js
 
       - name: Pull (rebase) then push with retry
+        shell: bash
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # 変更がなければ何もしない
+          # 変更がなければ終了
           if git diff --quiet; then
             echo "No changes."
             exit 0
@@ -36,9 +38,9 @@ jobs:
           git add data/*.json
           git commit -m "chore(data): update open-meteo JSON [skip ci]"
 
-          # 競合を避けるためrebase pull→push（2回まで再試行）
+          # rebase pull → push（最大2回リトライ）
           for i in 1 2; do
-            if git pull --rebase origin main; then
+            if git pull --rebase --autostash origin main; then
               if git push origin HEAD:main; then
                 echo "Pushed."
                 exit 0
@@ -48,4 +50,5 @@ jobs:
             sleep 3
           done
 
-          echo "Push failed"; exit 1
+          echo "Push failed"
+          exit 1
