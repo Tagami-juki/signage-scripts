@@ -436,7 +436,9 @@ async function buildMap(elId, regionKey){
 /* ===== 初期化 ===== */
 window.addEventListener("load", async () => {
     // どれか1面で失敗しても他は出す
-  const safeBuild = (id, key) => buildMap(id, key).catch(err => console.error('map error', key, err));
+  const safeBuild = (id, key) =>
+    buildMap(id, key).catch(err => console.error('map error', key, err));
+  
   safeBuild("map-kyushu","kyushu");
   safeBuild("map-okinawa","okinawa");
   safeBuild("map-honshu","honshu");
@@ -451,11 +453,13 @@ window.addEventListener("load", async () => {
   // 概況ティッカー
   await buildAndRenderTicker();
 
-  // 定期更新（10分毎 / ティッカーも更新）
-  setInterval(async () => {
-    const base = location.href.split("#")[0].split("?")[0];
-    location.replace(`${base}?v=${Date.now()}`);
-  }, 10*60*1000);
+  // 定期更新（10分毎 / 表示中のみ）
+  if (!IS_EDIT) {
+    setInterval(() => {
+      const base = location.href.split("#")[0].split("?")[0];
+      location.replace(`${base}?v=${Date.now()}`);
+    }, 10*60*1000);
+  }
 });
 </script>
 </body>
