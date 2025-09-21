@@ -264,8 +264,8 @@
       const j  = await loadJSON(p.id);
       const t  = j?.current?.temperature_2m;
       const wc = j?.current?.weather_code ?? j?.daily?.weather_code?.[0];
-      const label = (typeof t === "number") ? `${wcToEmoji(wc)} ${Math.round(t)}℃` : `${p.name}`;
-      L.marker([p.lat,p.lon], { icon: iconText(label) }).addTo(map);
+      const html = (typeof t === "number") ? labelHTML(wc, t) : `<span class="wx-temp">${p.name}</span>`;
+      L.marker([p.lat,p.lon], { icon: makeDivIcon(html) }).addTo(map);
     }
 
     // HUD（edit=1）
