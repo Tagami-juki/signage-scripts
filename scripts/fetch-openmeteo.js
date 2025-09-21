@@ -15,7 +15,7 @@ const places = [
   { id: "hiroshima",name: "広島市",   lat: 34.39161, lon: 132.45182 },
   { id: "fukuoka",  name: "福岡市",   lat: 33.58333, lon: 130.39999 },
   { id: "morioka",  name: "盛岡市",   lat: 39.70000, lon: 141.15000 },
-  { id: "hakodate", name: "函館市",   lat: 41.76861, lon: 140.72889 },
+  { id: "sapporo",  name: "札幌市",   lat: 43.06417, lon: 141.34694 },
   { id: "niigata",  name: "新潟市",   lat: 37.91611, lon: 139.03639 },
   { id: "toyama",   name: "富山市",   lat: 36.69592, lon: 137.21369 },
   { id: "miyazaki", name: "宮崎市",   lat: 31.90778, lon: 131.42028 },
