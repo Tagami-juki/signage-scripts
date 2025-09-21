@@ -1,141 +1,119 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>全国のお天気｜3分割＋九州/沖縄（7:3）</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>全国のお天気｜3分割＋九州/沖縄（7:3）＋概況ティッカー</title>
 
-  <!-- Leaflet -->
-  <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <style>
-    html,body {height:100%; margin:0; background:#0b1220; color:#fff;}
+<style>
+  html,body {height:100%; margin:0; background:#0b1220; color:#fff;}
 
-    :root{
-      /* 上部帯の高さ */
-      --topbar-h: 48px;
+  :root{
+    --topbar-h: 56px;
+    --w-left:   0.9; --w-center: 1.2; --w-right: 0.9;
+    --h-kyushu: 7;   --h-okinawa: 3;
 
-      /* 3カラムの横幅比率（左=九州+沖縄 / 中央=本州 / 右=北海道） */
-      --w-left:   0.9;
-      --w-center: 1.2;
-      --w-right:  0.9;
+    --emoji-scale: 1.9; --temp-scale: 1.2;
+    --temp-stroke: 2px; --temp-stroke-color: rgba(0,0,0,.55);
+  }
 
-      /* 左カラム：上=九州 / 下=沖縄 の縦比率（7:3） */
-      --h-kyushu:  7;
-      --h-okinawa: 3;
+  /* ===== Top bar ===== */
+  .topbar{
+    position: fixed; left:0; right:0; top:0; height: var(--topbar-h);
+    display:flex; align-items:center; gap:14px;
+    padding: 0 16px;
+    background: rgba(11,18,32,.75);
+    color:#fff; z-index:999;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 2px 12px rgba(0,0,0,.35);
+  }
+  .topbar__title{
+    flex: 0 0 auto;
+    font-weight:900; font-size:26px; letter-spacing:.04em;
+    text-shadow: 0 2px 6px rgba(0,0,0,.45);
+    white-space:nowrap;
+  }
+  .topbar__ticker{
+    flex: 1 1 auto; overflow:hidden; min-width: 30%;
+    position: relative;
+  }
+  .ticker__track{
+    display:inline-block; white-space:nowrap; will-change: transform;
+    animation: ticker 28s linear infinite;
+  }
+  .topbar__ticker:hover .ticker__track{ animation-play-state: paused; }
+  @keyframes ticker{
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); } /* テキストを2回連結して無限ループ */
+  }
+  .ticker__text{ opacity:.96; text-shadow: 0 1px 4px rgba(0,0,0,.25); }
+  .topbar__meta{ flex: 0 0 auto; font-size:14px; opacity:.9; white-space:nowrap; }
 
-      /* 天気ラベルの倍率（アイコンと温度を別々に） */
-      --emoji-scale: 1.9;  /* 1.6〜2.2 くらいで調整 */
-      --temp-scale:  1.0;  /* 1.0〜1.4 くらいで調整 */
-      
-      /* 温度表示の縁取りの太さと色 */
-      --temp-stroke: 1px;/* 1080p: 2–4px / 4K: 4–6px 目安 */
-      --temp-stroke-color: rgba(0,0,0,.55);/* 縁取り色（黒系） */
-    }
+  /* ===== layout ===== */
+  .wrap{ display:flex; width:100vw; height: calc(100vh - var(--topbar-h)); margin-top: var(--topbar-h); }
+  .panel {position:relative; min-width:0; border-left:1px solid #2c3143;}
+  .panel:first-child{border-left:none;}
+  .panel[data-col="left"]   { flex: var(--w-left); }
+  .panel[data-col="center"] { flex: var(--w-center); }
+  .panel[data-col="right"]  { flex: var(--w-right); }
 
-    /* 上部の帯（タイトル） */
-    .topbar{
-      position: fixed; left:0; right:0; top:0; height: var(--topbar-h);
-      display:flex; align-items:center; justify-content:space-between; gap:16px;
-      padding: 0 20px;
-      background: rgba(11,18,32,.72);
-      color:#fff; z-index:999;
-      backdrop-filter: blur(6px);
-      box-shadow: 0 2px 12px rgba(0,0,0,.35);
-    }
-    .topbar__title{
-      font-weight:800; font-size:28px; letter-spacing:.05em;
-      text-shadow: 0 2px 6px rgba(0,0,0,.45);
-    }
-    .topbar__meta{ font-size:14px; opacity:.9; }
+  .panel[data-col="left"] .col-vert{ display:flex; flex-direction:column; height:100%; width:100%; }
+  .subpanel[data-region="kyushu"]  { flex: var(--h-kyushu) 1 0; }
+  .subpanel[data-region="okinawa"] { flex: var(--h-okinawa) 1 0; }
+  .subpanel {position:relative; min-height:0; overflow:hidden;}
+  .map {position:absolute; inset:0;}
 
-    /* 本文（マップ3分割） */
-    .wrap{
-      display:flex; width:100vw;
-      height: calc(100vh - var(--topbar-h));
-      margin-top: var(--topbar-h);
-    }
-    .panel {position:relative; min-width:0; border-left:1px solid #2c3143;}
-    .panel:first-child{border-left:none;}
-    .panel[data-col="left"]   { flex: var(--w-left); }
-    .panel[data-col="center"] { flex: var(--w-center); }
-    .panel[data-col="right"]  { flex: var(--w-right); }
+  .title{
+    position:absolute; left:8px; top:6px; z-index:10; font-weight:800; color:#fff;
+    text-shadow:0 0 3px rgba(0,0,0,.7),0 0 6px rgba(0,0,0,.4); letter-spacing:.05em;
+  }
+  .note{ position:absolute; right:8px; bottom:6px; font-size:.8rem; opacity:.8; color:#cfd6ea; }
 
-    /* 左カラムを上下に分割（比率を厳守） */
-    .panel[data-col="left"] .col-vert{ display:flex; flex-direction:column; height:100%; width:100%; }
-    .subpanel[data-region="kyushu"]  { flex: var(--h-kyushu) 1 0; }
-    .subpanel[data-region="okinawa"] { flex: var(--h-okinawa) 1 0; }
+  .hud{ display:none; position:absolute; right:8px; top:6px; z-index:20;
+        background:rgba(0,0,0,.35); color:#fff; padding:6px 8px; border-radius:8px;
+        font-size:12px; line-height:1.4; box-shadow:0 4px 14px rgba(0,0,0,.25); backdrop-filter: blur(2px);}
+  .hud .row{white-space:nowrap} .hud button{ margin-left:6px; padding:2px 6px;
+    border:1px solid rgba(255,255,255,.35); background:rgba(255,255,255,.1); color:#fff; border-radius:6px; cursor:pointer;}
+  .is-edit .hud{display:block;}
 
-    .subpanel {position:relative; min-height:0; overflow:hidden;}
-    .map {position:absolute; inset:0;}
+  .relief-overlay { mix-blend-mode: multiply; }
+  .base-tiles{ filter: brightness(1.05) contrast(0.85) saturate(0.75) opacity(0.95); }
 
-    .title{
-      position:absolute; left:8px; top:6px; z-index:10; font-weight:800; color:#fff;
-      text-shadow:0 0 3px rgba(0,0,0,.7),0 0 6px rgba(0,0,0,.4); letter-spacing:.05em;
-    }
-    .note{
-      position:absolute; right:8px; bottom:6px; font-size:.8rem; opacity:.8; color:#cfd6ea;
-    }
-
-    /* 調整用HUD（?edit=1 のときだけ表示） */
-    .hud{
-      display:none; position:absolute; right:8px; top:6px; z-index:20;
-      background:rgba(0,0,0,.35); color:#fff; padding:6px 8px; border-radius:8px;
-      font-size:12px; line-height:1.4; box-shadow:0 4px 14px rgba(0,0,0,.25);
-      backdrop-filter: blur(2px);
-    }
-    .hud .row{white-space:nowrap}
-    .hud button{
-      margin-left:6px; padding:2px 6px; border:1px solid rgba(255,255,255,.35);
-      background:rgba(255,255,255,.1); color:#fff; border-radius:6px; cursor:pointer;
-    }
-    .is-edit .hud{display:block;}
-
-    /* タイルの見た目微調整 */
-    .relief-overlay { mix-blend-mode: multiply; }
-    .base-tiles{ filter: brightness(1.05) contrast(0.85) saturate(0.75) opacity(0.95); }
-
-    /* 天気ラベル（アイコン大、温度は別サイズ） */
-    .wx-label{
-      display:inline-flex;
-      flex-direction: column;
-      align-items:center; 
-      gap:1px;
-      font-weight:700;
-      font-size:16px;
-      color:#fff;
-      pointer-events:none;
-      text-shadow:0 0 2px rgba(0,0,0,.65),0 0 4px rgba(0,0,0,.35);
-    }
-    .wx-label .wx-emoji{
-      font-size: calc(1em * var(--emoji-scale));
-      line-height: 1; filter: drop-shadow(0 0 2px rgba(0,0,0,.45));
-    }
-    
-    /* 温度テキスト */
-    .wx-label .wx-temp{
-      font-size: calc(1em * var(--temp-scale));
-      font-weight: 800;
-      -webkit-text-stroke: var(--temp-stroke) var(--temp-stroke-color);
-      text-shadow: 0 0 3px rgba(0,0,0,.35),0 1px 6px rgba(0,0,0,.25);
-    }
-    .wx-emoji-img{
-      width: calc(20px * var(--emoji-scale)); height:auto; vertical-align: middle;
-      filter: drop-shadow(0 0 2px rgba(0,0,0,.5));
-    }
-  </style>
+  .wx-label{ display:inline-flex; flex-direction: column; align-items:center; gap:1px;
+             font-weight:700; font-size:16px; color:#fff; pointer-events:none; }
+  .wx-label .wx-emoji{ font-size: calc(1em * var(--emoji-scale)); line-height:1; filter: drop-shadow(0 0 2px rgba(0,0,0,.45)); }
+  .wx-label .wx-temp{
+    font-size: calc(1em * var(--temp-scale)); font-weight: 800; color:#fff;
+    -webkit-text-stroke: var(--temp-stroke) var(--temp-stroke-color);
+    text-shadow: 0 1px 4px rgba(0,0,0,.22);
+  }
+  .wx-emoji-img{ width: calc(20px * var(--emoji-scale)); height:auto; vertical-align: middle;
+                 filter: drop-shadow(0 0 2px rgba(0,0,0,.5)); }
+  @media (prefers-reduced-motion: reduce){
+    .ticker__track{ animation: none !important; }
+  }
+</style>
 </head>
 <body>
-  <!-- 上部帯 -->
+  <!-- ===== Top bar ===== -->
   <div class="topbar">
     <div class="topbar__title">全国のお天気</div>
+    <!-- ▼ 概況ティッカー -->
+    <div class="topbar__ticker">
+      <div class="ticker__track" id="ticker-track">
+        <span class="ticker__text" id="ticker-text">データ準備中…</span>
+        <span class="ticker__text" aria-hidden="true" id="ticker-dup">　｜　</span>
+      </div>
+    </div>
+    <!-- ▲ -->
     <div class="topbar__meta" id="tb-time">更新: --/-- --:--</div>
   </div>
 
-  <!-- 3分割レイアウト -->
+  <!-- ===== 3分割 ===== -->
   <div class="wrap">
-    <!-- 左：九州（上）＋沖縄（下） -->
     <div class="panel" data-col="left">
       <div class="col-vert">
         <div class="subpanel" data-region="kyushu">
@@ -151,14 +129,12 @@
       </div>
     </div>
 
-    <!-- 中央：本州 -->
     <div class="panel" data-col="center" data-region="honshu">
       <div class="title">本州</div>
       <div class="hud"><div class="row">lat:<span class="lat"></span> lon:<span class="lon"></span> z:<span class="z"></span><button class="copy">Copy</button></div></div>
       <div id="map-honshu" class="map"></div>
     </div>
 
-    <!-- 右：北海道 -->
     <div class="panel" data-col="right" data-region="hokkaido">
       <div class="title">北海道</div>
       <div class="hud"><div class="row">lat:<span class="lat"></span> lon:<span class="lon"></span> z:<span class="z"></span><button class="copy">Copy</button></div></div>
@@ -168,212 +144,299 @@
 
   <div class="note">地図: 地理院タイル / データ: Open-Meteo</div>
 
-  <script>
-  // ===== タイル定義 =====
-  const BASE_TILE   = 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png';   // 淡色
-  const RELIEF_TILE = 'https://cyberjapandata.gsi.go.jp/xyz/relief/{z}/{x}/{y}.png'; // 標高
-  const RELIEF_OPACITY = 0.45;
-  const ATTR = '&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>';
+<script>
+/* ===== タイル ===== */
+const BASE_TILE   = 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png';
+const RELIEF_TILE = 'https://cyberjapandata.gsi.go.jp/xyz/relief/{z}/{x}/{y}.png';
+const RELIEF_OPACITY = 0.45;
+const ATTR = '&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>';
 
-  const urlp = new URLSearchParams(location.search);
-  const IS_EDIT = urlp.get('edit') === '1';
-  if (IS_EDIT) document.body.classList.add('is-edit');
+const urlp = new URLSearchParams(location.search);
+const IS_EDIT = urlp.get('edit') === '1';
+if (IS_EDIT) document.body.classList.add('is-edit');
 
-  const USE_FIXED_VIEW = true; // サイネージでは固定表示
+const USE_FIXED_VIEW = true;
 
-  // 上部帯の時刻表示
-  function updateTopbarTime(){
-    const el = document.getElementById('tb-time');
-    if(!el) return;
-    const d = new Date();
-    const pad = n => String(n).padStart(2,'0');
-    el.textContent = `更新: ${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  }
-  updateTopbarTime();
-  setInterval(updateTopbarTime, 60*1000);
+/* ===== 時刻表示 ===== */
+function updateTopbarTime(){
+  const el = document.getElementById('tb-time'); if(!el) return;
+  const d = new Date(); const pad = n => String(n).padStart(2,'0');
+  el.textContent = `更新: ${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+updateTopbarTime(); setInterval(updateTopbarTime, 60*1000);
 
-  // 固定ビュー（必要に応じて調整）
-  const PANEL_VIEW = {
-    kyushu:   { center: [32.53711, 130.77553], zoom: 7 },
-    okinawa:  { center: [26.26865, 128.18304], zoom: 7 },
-    honshu:   { center: [37.04665, 137.07624], zoom: 6 },
-    hokkaido: { center: [41.76261, 142.96465], zoom: 6 },
-  };
+/* ===== 固定ビュー ===== */
+const PANEL_VIEW = {
+  kyushu:   { center: [32.53711, 130.77553], zoom: 7 },
+  okinawa:  { center: [26.26865, 128.18304], zoom: 7 },
+  honshu:   { center: [37.04665, 137.07624], zoom: 6 },
+  hokkaido: { center: [41.76261, 142.96465], zoom: 6 },
+};
+const REGION_BOUNDS = {
+  kyushu:   [[30.0, 128.0], [34.5, 132.8]],
+  okinawa:  [[24.0, 122.5], [27.8, 129.8]],
+  honshu:   [[33.0, 130.0], [41.9, 142.5]],
+  hokkaido: [[41.2, 139.0], [45.9, 146.5]],
+};
+const REGION_ZOOM_MAX = { kyushu:7, okinawa:10, honshu:6, hokkaido:6 };
 
-  // 自動フィットの保険（固定を使わない時だけ参照）
-  const REGION_BOUNDS = {
-    kyushu:   [[30.0, 128.0], [34.5, 132.8]],
-    okinawa:  [[24.0, 122.5], [27.8, 129.8]],
-    honshu:   [[33.0, 130.0], [41.9, 142.5]],
-    hokkaido: [[41.2, 139.0], [45.9, 146.5]],
-  };
-  const REGION_ZOOM_MAX = { kyushu:7, okinawa:10, honshu:6, hokkaido:6 };
+/* ===== 表示地点 ===== */
+const PLACES = [
+  // 九州
+  { id:"fukuoka",   name:"福岡市",   pref:"福岡県",   lat:33.58333, lon:130.39999 },
+  { id:"kumamoto",  name:"熊本市",   pref:"熊本県",   lat:32.80310, lon:130.70790 },
+  { id:"nagasaki",  name:"長崎市",   pref:"長崎県",   lat:32.75030, lon:129.87770 },
+  { id:"oita",      name:"大分市",   pref:"大分県",   lat:33.23960, lon:131.60930 },
+  { id:"miyazaki",  name:"宮崎市",   pref:"宮崎県",   lat:31.90778, lon:131.42028 },
+  { id:"kagoshima", name:"鹿児島市", pref:"鹿児島県", lat:31.56670, lon:130.55000 },
+  // 沖縄
+  { id:"naha",      name:"那覇市",   pref:"沖縄県",   lat:26.21240, lon:127.68093 },
+  // 本州
+  { id:"akita",     name:"秋田市",   pref:"秋田県",   lat:39.72000, lon:140.10350 },
+  { id:"ishikawa",  name:"金沢市",   pref:"石川県",   lat:36.56130, lon:136.65620 },
+  { id:"shizuoka",  name:"静岡市",   pref:"静岡県",   lat:34.97560, lon:138.38280 },
+  { id:"okayama",   name:"岡山市",   pref:"岡山県",   lat:34.65500, lon:133.91950 },
+  { id:"osaka",     name:"大阪市",   pref:"大阪府",   lat:34.69374, lon:135.50217 },
+  { id:"nagoya",    name:"名古屋市", pref:"愛知県",   lat:35.18145, lon:136.90640 },
+  { id:"hiroshima", name:"広島市",   pref:"広島県",   lat:34.39161, lon:132.45182 },
+  { id:"niigata",   name:"新潟市",   pref:"新潟県",   lat:37.91611, lon:139.03639 },
+  { id:"morioka",   name:"盛岡市",   pref:"岩手県",   lat:39.70000, lon:141.15000 },
+  { id:"sendai",    name:"仙台市",   pref:"宮城県",   lat:38.26884, lon:140.87194 },
+  { id:"chiyoda",   name:"千代田",   pref:"東京都",   lat:35.69000, lon:139.76000 },
+  { id:"kisarazu",  name:"木更津市", pref:"千葉県",   lat:35.37610, lon:139.91700 },
+  // 北海道
+  { id:"sapporo",   name:"札幌市",   pref:"北海道",   lat:43.06417, lon:141.34694 },
+  { id:"hakodate",  name:"函館市",   pref:"北海道",   lat:41.76870, lon:140.72880 },
+  { id:"wakkanai",  name:"稚内市",   pref:"北海道",   lat:45.41560, lon:141.67300 },
+  { id:"abashiri",  name:"網走市",   pref:"北海道",   lat:44.02000, lon:144.26970 },
+  { id:"kushiro",   name:"釧路市",   pref:"北海道",   lat:42.98490, lon:144.38190 },
+  { id:"furano",    name:"富良野市", pref:"北海道",   lat:43.34200, lon:142.38300 },
+];
 
-  // ===== 表示地点（ご指定分をすべて含む） =====
-  const PLACES = [
-    // 九州
-    { id:"fukuoka",   name:"福岡市",   pref:"福岡県",   lat:33.58333, lon:130.39999 },
-    { id:"kumamoto",  name:"熊本市",   pref:"熊本県",   lat:32.80310, lon:130.70790 },
-    { id:"nagasaki",  name:"長崎市",   pref:"長崎県",   lat:32.75030, lon:129.87770 },
-    { id:"oita",      name:"大分市",   pref:"大分県",   lat:33.23960, lon:131.60930 },
-    { id:"miyazaki",  name:"宮崎市",   pref:"宮崎県",   lat:31.90778, lon:131.42028 },
-    { id:"kagoshima", name:"鹿児島市", pref:"鹿児島県", lat:31.56670, lon:130.55000 },
-
-    // 沖縄
-    { id:"naha",      name:"那覇市",   pref:"沖縄県",   lat:26.21240, lon:127.68093 },
-
-    // 本州（四国含む）
-    { id:"akita",     name:"秋田市",   pref:"秋田県",   lat:39.72000, lon:140.10350 },
-    { id:"ishikawa",  name:"金沢市",   pref:"石川県",   lat:36.56130, lon:136.65620 },
-    { id:"shizuoka",  name:"静岡市",   pref:"静岡県",   lat:34.97560, lon:138.38280 },
-    { id:"okayama",   name:"岡山市",   pref:"岡山県",   lat:34.65500, lon:133.91950 },
-
-    { id:"osaka",     name:"大阪市",   pref:"大阪府",   lat:34.69374, lon:135.50217 },
-    { id:"nagoya",    name:"名古屋市", pref:"愛知県",   lat:35.18145, lon:136.90640 },
-    { id:"hiroshima", name:"広島市",   pref:"広島県",   lat:34.39161, lon:132.45182 },
-    { id:"niigata",   name:"新潟市",   pref:"新潟県",   lat:37.91611, lon:139.03639 },
-    { id:"morioka",   name:"盛岡市",   pref:"岩手県",   lat:39.70000, lon:141.15000 },
-    { id:"sendai",    name:"仙台市",   pref:"宮城県",   lat:38.26884, lon:140.87194 },
-    { id:"chiyoda",   name:"千代田",   pref:"東京都",   lat:35.69000, lon:139.76000 },
-
-    // 北海道
-    { id:"sapporo",   name:"札幌市",   pref:"北海道",   lat:43.06417, lon:141.34694 },
-    { id:"hakodate",  name:"函館市",   pref:"北海道",   lat:41.76870, lon:140.72880 },
-    { id:"wakkanai",  name:"稚内市",   pref:"北海道",   lat:45.41560, lon:141.67300 },
-    { id:"abashiri",  name:"網走市",   pref:"北海道",   lat:44.02000, lon:144.26970 },
-    { id:"kushiro",   name:"釧路市",   pref:"北海道",   lat:42.98490, lon:144.38190 },
-    { id:"furano",    name:"富良野市", pref:"北海道",   lat:43.34200, lon:142.38300 },
-  ];
-
-  // === アイコン設定（絵文字を大きく / 画像に差し替え可） ===
-  const USE_IMAGE_ICONS = true;       // 画像アイコンを使うなら true
-  const ICON_BASE = "icons";           // icons/clear.svg などを配置
-
+/* ===== アイコン ===== */
+const USE_IMAGE_ICONS = true;
+const ICON_BASE = "icons";
 function codeToName(wc){
-  // WMO → 12分類
-  if (wc === 0) return "clear";                     // 快晴
-  if (wc === 1) return "mostly_clear";              // 晴れ（少し雲）
-  if (wc === 2) return "partly";                    // 晴れ時々くもり
-  if (wc === 3) return "overcast";                  // くもり（鉛色）
+  if (wc===0) return "clear";
+  if (wc===1) return "mostly_clear";
+  if (wc===2) return "partly";
+  if (wc===3) return "overcast";
+  if ([45,48].includes(wc)) return "fog";
+  if ([51,53,55,56,57].includes(wc)) return "drizzle";
+  if ([61,80].includes(wc)) return "rain_light";
+  if ([63,66,81].includes(wc)) return "rain";
+  if ([65,67,82].includes(wc)) return "rain_heavy";
+  if ([71,77,85].includes(wc)) return "snow_light";
+  if ([73,86].includes(wc)) return "snow";
+  if (wc===75) return "snow_heavy";
+  if ([95,96,99].includes(wc)) return "thunder";
+  return "partly";
+}
+function iconTagFor(wc){ return USE_IMAGE_ICONS
+   ? `<img class="wx-emoji-img" src="${ICON_BASE}/${codeToName(wc)}.svg" alt="">`
+   : `<span class="wx-emoji">${({0:"☀",1:"🌤",2:"⛅",3:"☁",45:"🌫",48:"🌫",51:"🌦",53:"🌦",55:"🌦",61:"🌧",63:"🌧",65:"🌧",71:"🌨",73:"🌨",75:"🌨",95:"⛈",96:"⛈",99:"⛈"})[wc] ?? "⛅"}</span>`; }
+function labelHTML(wc, temp){
+  const icon = iconTagFor(wc);
+  const t = (typeof temp === "number") ? `<span class="wx-temp">${Math.round(temp)}℃</span>` : "";
+  return `${icon}${t}`;
+}
+function makeDivIcon(html){
+  return L.divIcon({ className:"wx-label", html, iconSize:null, iconAnchor:[0,0] });
+}
 
-  if (wc === 45 || wc === 48) return "fog";        // 霧・着氷性霧
+/* ===== JSON読み込み（キャッシュ付き） ===== */
+const JSON_CACHE = new Map();
+async function loadJSON(id){
+  if (JSON_CACHE.has(id)) return JSON_CACHE.get(id);
+  try{
+    const res = await fetch(`data/${id}.json?ts=${Date.now()}`, { cache:"no-store" });
+    if(!res.ok) return null;
+    const j = await res.json();
+    JSON_CACHE.set(id, j);
+    return j;
+  }catch{ return null; }
+}
 
-  if ([51,53,55,56,57].includes(wc)) return "drizzle"; // 霧雨/着氷性霧雨
+/* ===== 地域区分（概況用） ===== */
+const PREF_TO_REGION = {
+  "北海道":"北日本",
+  "青森県":"北日本","岩手県":"北日本","宮城県":"北日本","秋田県":"北日本","山形県":"北日本","福島県":"北日本",
+  "新潟県":"東日本","富山県":"東日本","石川県":"東日本","福井県":"東日本","長野県":"東日本","山梨県":"東日本",
+  "茨城県":"東日本","栃木県":"東日本","群馬県":"東日本","埼玉県":"東日本","千葉県":"東日本","東京都":"東日本","神奈川県":"東日本",
+  "静岡県":"東日本","愛知県":"東日本",
+  "岐阜県":"西日本","三重県":"西日本","滋賀県":"西日本","京都府":"西日本","大阪府":"西日本","兵庫県":"西日本","奈良県":"西日本","和歌山県":"西日本",
+  "鳥取県":"西日本","島根県":"西日本","岡山県":"西日本","広島県":"西日本","山口県":"西日本","徳島県":"西日本","香川県":"西日本","愛媛県":"西日本","高知県":"西日本",
+  "福岡県":"西日本","佐賀県":"西日本","長崎県":"西日本","熊本県":"西日本","大分県":"西日本","宮崎県":"西日本","鹿児島県":"西日本",
+  "沖縄県":"沖縄"
+};
+function wcCategory(wc){
+  if ([95,96,99].includes(wc)) return "雷";
+  if ([71,73,75,77,85,86].includes(wc)) return "雪";
+  if ([61,63,65,66,67,80,81,82,51,53,55,56,57].includes(wc)) return "雨";
+  if (wc===0||wc===1||wc===2) return "晴";
+  if (wc===3) return "曇";
+  if ([45,48].includes(wc)) return "霧";
+  return "曇";
+}
 
-  if ([61,80].includes(wc)) return "rain_light";   // 弱い雨/にわか雨(弱)
-  if ([63,66,81].includes(wc)) return "rain";      // 雨/着氷性雨/にわか雨
-  if ([65,67,82].includes(wc)) return "rain_heavy";// 強い雨/にわか雨(強)
-
-  if ([71,77,85].includes(wc)) return "snow_light";// 弱い雪/雪あられ/にわか雪(弱)
-  if ([73,86].includes(wc))   return "snow";       // 雪/にわか雪
-  if (wc === 75)              return "snow_heavy"; // 強い雪
-
-  if ([95,96,99].includes(wc)) return "thunder";   // 雷（ひょう含む）
-
-  return "partly"; // フォールバック
-  }
-  function iconTagFor(wc){
-    if (USE_IMAGE_ICONS){
-      const name = codeToName(wc);
-      return `<img class="wx-emoji-img" src="${ICON_BASE}/${name}.svg" alt="">`;
+/* ===== 概況の自動生成 ===== */
+async function buildAndRenderTicker(){
+  // 全地点のデータを取得
+  const points = [];
+  for (const p of PLACES){
+    const j = await loadJSON(p.id);
+    const t = j?.current?.temperature_2m;
+    const wc = j?.current?.weather_code ?? j?.daily?.weather_code?.[0];
+    if (typeof wc === "number"){
+      points.push({pref:p.pref, name:p.name, region: PREF_TO_REGION[p.pref] ?? "東日本", temp: t, wc, cat: wcCategory(wc)});
     }
-    return `<span class="wx-emoji">${wcToEmoji(wc)}</span>`;
   }
-  function labelHTML(wc, temp){
-    const icon = iconTagFor(wc);
-    const t = (typeof temp === "number") ? `<span class="wx-temp">${Math.round(temp)}℃</span>` : "";
-    return `${icon}${t}`;
+  if (!points.length){ setTickerText("全国概況：データ準備中…"); return; }
+
+  // 全国の傾向
+  const tally = (arr) => arr.reduce((a,b)=> (a[b]=(a[b]||0)+1, a), {});
+  const cats = tally(points.map(p=>p.cat));
+  const topCat = Object.entries(cats).sort((a,b)=>b[1]-a[1])[0]?.[0] ?? "晴";
+  const nationalSent =
+    topCat==="晴" ? "全国的に晴れ間が出る所が多いでしょう" :
+    topCat==="曇" ? "雲の広がる所が多い見込みです" :
+    topCat==="雨" ? "雨の降る所が多く、折りたたみ傘があると安心です" :
+    topCat==="雪" ? "雪の降る所があるでしょう" :
+    topCat==="雷" ? "大気の状態が不安定で雷雨に注意が必要です" :
+    "概ね曇りがちの天気でしょう";
+
+  // 地域別コメント
+  const byRegion = { "北日本":[], "東日本":[], "西日本":[], "沖縄":[] };
+  for (const p of points){ (byRegion[p.region]??= []).push(p); }
+  function regionTempRange(list){
+    const temps = list.map(p=>p.temp).filter(v=>typeof v==="number");
+    if(!temps.length) return null;
+    return [Math.round(Math.min(...temps)), Math.round(Math.max(...temps))];
   }
-  function makeDivIcon(html){
-    return L.divIcon({ className:"wx-label", html, iconSize:null, iconAnchor:[0,0] });
+  function pickRegionNote(rKey){
+    const list = byRegion[rKey]||[];
+    if(!list.length) return null;
+    const cats = tally(list.map(p=>p.cat));
+    const main = Object.entries(cats).sort((a,b)=>b[1]-a[1])[0][0];
+    if (main==="晴") return `${rKey}は日差しの届く所が多い見込み`;
+    if (main==="曇") return `${rKey}は雲が多くスッキリしない天気`;
+    if (main==="雨") return `${rKey}ではにわか雨の可能性があり、外出時は雨具を`;
+    if (main==="雪") return `${rKey}では雪の降る所があるでしょう`;
+    if (main==="雷") return `${rKey}は雷雨の恐れ。急な天気の変化に注意`;
+    return null;
   }
+  const notes = ["北日本","東日本","西日本","沖縄"].map(pickRegionNote).filter(Boolean);
+  const rN = {
+    "北日本": regionTempRange(byRegion["北日本"]||[]),
+    "東日本": regionTempRange(byRegion["東日本"]||[]),
+    "西日本": regionTempRange(byRegion["西日本"]||[]),
+  };
+  const tempSent = [ "西日本","東日本","北日本" ]
+    .map(k => rN[k] ? `${k}で${rN[k][0]}〜${rN[k][1]}℃` : null)
+    .filter(Boolean).join("、");
 
-  // ===== ユーティリティ =====
-  async function loadJSON(id){
-    try{
-      const res = await fetch(`data/${id}.json?ts=${Date.now()}`, { cache:"no-store" });
-      if(!res.ok) return null;
-      return await res.json();
-    }catch{ return null; }
-  }
-  function wcToEmoji(wc){
-    return ({0:"☀",1:"🌤",2:"⛅",3:"☁",45:"🌫",48:"🌫",51:"🌦",53:"🌦",55:"🌦",
-             61:"🌧",63:"🌧",65:"🌧",71:"🌨",73:"🌨",75:"🌨",95:"⛈",96:"⛈",99:"⛈"})[wc] ?? "⛅";
-  }
-  function subset(region){
-    if(region==="kyushu")   return PLACES.filter(p => ["福岡県","熊本県","長崎県","大分県","宮崎県","鹿児島県"].includes(p.pref));
-    if(region==="okinawa")  return PLACES.filter(p => p.pref==="沖縄県");
-    if(region==="hokkaido") return PLACES.filter(p => p.pref==="北海道");
-    return PLACES.filter(p => !["北海道","沖縄県","福岡県","熊本県","長崎県","大分県","宮崎県","鹿児島県"].includes(p.pref)); // 本州
-  }
+  const synopsis =
+    `全国概況：${nationalSent}。` +
+    (notes.length ? notes.join("。")+"。" : "") +
+    (tempSent ? `最高気温は${tempSent}の所が多いでしょう。` : "");
 
-  // ===== マップ生成 =====
-  async function buildMap(elId, regionKey){
-    const holder = document.querySelector(`[data-region="${regionKey}"]`) || document.querySelector(`[id="${elId}"]`)?.parentElement;
-    const map = L.map(elId, {
-      zoomControl: IS_EDIT, attributionControl:false,
-      dragging: IS_EDIT, scrollWheelZoom: IS_EDIT, doubleClickZoom: IS_EDIT,
-      touchZoom: IS_EDIT, boxZoom: IS_EDIT, keyboard: IS_EDIT
-    });
+  setTickerText(synopsis);
+}
 
-    // ベース＋標高オーバーレイ
-    L.tileLayer(BASE_TILE,   { attribution: ATTR, maxZoom: 18, className:'base-tiles' }).addTo(map);
-    L.tileLayer(RELIEF_TILE, { attribution: ATTR, maxZoom: 18, opacity: RELIEF_OPACITY, className:'relief-overlay' }).addTo(map);
+/* ティッカーに文字を流す（テキスト長に応じ速度調整） */
+function setTickerText(text){
+  const main = document.getElementById('ticker-text');
+  const dup  = document.getElementById('ticker-dup');
+  const track= document.getElementById('ticker-track');
+  if(!main||!dup||!track) return;
 
-    if (USE_FIXED_VIEW && PANEL_VIEW[regionKey]){
-      map.setView(PANEL_VIEW[regionKey].center, PANEL_VIEW[regionKey].zoom);
-    } else {
-      setTimeout(() => {
-        map.invalidateSize(true);
-        map.fitBounds(REGION_BOUNDS[regionKey], { padding:[16,16] });
-        const zmax = REGION_ZOOM_MAX[regionKey] ?? map.getZoom();
-        if (map.getZoom() > zmax) map.setZoom(zmax);
-      }, 0);
-    }
+  main.textContent = `　${text}　`;
+  dup.textContent  = `　｜　${text}　`; // 2本目（無限スクロール用）
 
-    // ラベル
-    for(const p of subset(regionKey)){
-      const j  = await loadJSON(p.id);
-      const t  = j?.current?.temperature_2m;
-      const wc = j?.current?.weather_code ?? j?.daily?.weather_code?.[0];
-      const html = (typeof t === "number") ? labelHTML(wc, t) : `<span class="wx-temp">${p.name}</span>`;
-      L.marker([p.lat,p.lon], { icon: makeDivIcon(html) }).addTo(map);
-    }
-
-    // HUD（edit=1）
-    const hud = holder?.querySelector('.hud');
-    if (IS_EDIT && hud){
-      const latEl = hud.querySelector('.lat'), lonEl = hud.querySelector('.lon'), zEl = hud.querySelector('.z');
-      const btn = hud.querySelector('.copy');
-      const upd = () => { const c = map.getCenter(); latEl.textContent=c.lat.toFixed(5); lonEl.textContent=c.lng.toFixed(5); zEl.textContent=map.getZoom().toFixed(0); };
-      map.on('moveend zoomend', upd); upd();
-      btn.addEventListener('click', async () => {
-        const c = map.getCenter(), z = map.getZoom();
-        const snippet = `  ${regionKey}: { center: [${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}], zoom: ${z} },`;
-        try { await navigator.clipboard.writeText(snippet); btn.textContent='Copied!'; setTimeout(()=>btn.textContent='Copy',1500); }
-        catch { alert(snippet); }
-      });
-    }
-
-    setTimeout(()=>map.invalidateSize(true),0);
-    return map;
-  }
-
-  // ===== 初期化 =====
-  window.addEventListener("load", async () => {
-    await Promise.all([
-      buildMap("map-kyushu",   "kyushu"),
-      buildMap("map-okinawa",  "okinawa"),
-      buildMap("map-honshu",   "honshu"),
-      buildMap("map-hokkaido", "hokkaido"),
-    ]);
-    if (!IS_EDIT) {
-      setInterval(() => {
-        const base = location.href.split("#")[0].split("?")[0];
-        location.replace(`${base}?v=${Date.now()}`); // 10分ごとにリロード
-      }, 10*60*1000);
-    }
+  // 幅からアニメ時間を自動調整（最小20s）
+  requestAnimationFrame(()=>{
+    const w = main.getBoundingClientRect().width;
+    const vw = Math.max(800, window.innerWidth);
+    const sec = Math.max(20, (w*2) / (vw*0.06)); // 係数は体感で調整
+    track.style.animationDuration = `${sec}s`;
   });
-  </script>
+}
+
+/* ===== マップ生成 ===== */
+async function buildMap(elId, regionKey){
+  const holder = document.querySelector(`[data-region="${regionKey}"]`) || document.querySelector(`[id="${elId}"]`)?.parentElement;
+  const map = L.map(elId, {
+    zoomControl: IS_EDIT, attributionControl:false,
+    dragging: IS_EDIT, scrollWheelZoom: IS_EDIT, doubleClickZoom: IS_EDIT,
+    touchZoom: IS_EDIT, boxZoom: IS_EDIT, keyboard: IS_EDIT
+  });
+  L.tileLayer(BASE_TILE,   { attribution: ATTR, maxZoom: 18, className:'base-tiles' }).addTo(map);
+  L.tileLayer(RELIEF_TILE, { attribution: ATTR, maxZoom: 18, opacity: RELIEF_OPACITY, className:'relief-overlay' }).addTo(map);
+
+  if (USE_FIXED_VIEW && PANEL_VIEW[regionKey]){
+    map.setView(PANEL_VIEW[regionKey].center, PANEL_VIEW[regionKey].zoom);
+  } else {
+    setTimeout(() => {
+      map.invalidateSize(true);
+      map.fitBounds(REGION_BOUNDS[regionKey], { padding:[16,16] });
+      const zmax = REGION_ZOOM_MAX[regionKey] ?? map.getZoom();
+      if (map.getZoom() > zmax) map.setZoom(zmax);
+    }, 0);
+  }
+
+  // ラベル
+  for(const p of PLACES){
+    const inThis =
+      (regionKey==="kyushu"  && ["福岡県","熊本県","長崎県","大分県","宮崎県","鹿児島県"].includes(p.pref)) ||
+      (regionKey==="okinawa" && p.pref==="沖縄県") ||
+      (regionKey==="hokkaido"&& p.pref==="北海道") ||
+      (regionKey==="honshu"  && !["沖縄県","北海道","福岡県","熊本県","長崎県","大分県","宮崎県","鹿児島県"].includes(p.pref));
+    if(!inThis) continue;
+
+    const j  = await loadJSON(p.id);
+    const t  = j?.current?.temperature_2m;
+    const wc = j?.current?.weather_code ?? j?.daily?.weather_code?.[0];
+    const html = (typeof t === "number") ? labelHTML(wc, t) : `<span class="wx-temp">${p.name}</span>`;
+    L.marker([p.lat,p.lon], { icon: makeDivIcon(html) }).addTo(map);
+  }
+
+  // HUD
+  const hud = holder?.querySelector('.hud');
+  if (IS_EDIT && hud){
+    const latEl = hud.querySelector('.lat'), lonEl = hud.querySelector('.lon'), zEl = hud.querySelector('.z');
+    const btn = hud.querySelector('.copy');
+    const upd = () => { const c = map.getCenter(); latEl.textContent=c.lat.toFixed(5); lonEl.textContent=c.lng.toFixed(5); zEl.textContent=map.getZoom().toFixed(0); };
+    map.on('moveend zoomend', upd); upd();
+    btn.addEventListener('click', async () => {
+      const c = map.getCenter(), z = map.getZoom();
+      const snippet = `  ${regionKey}: { center: [${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}], zoom: ${z} },`;
+      try { await navigator.clipboard.writeText(snippet); btn.textContent='Copied!'; setTimeout(()=>btn.textContent='Copy',1500); }
+      catch { alert(snippet); }
+    });
+  }
+
+  setTimeout(()=>map.invalidateSize(true),0);
+  return map;
+}
+
+/* ===== 初期化 ===== */
+window.addEventListener("load", async () => {
+  await Promise.all([
+    buildMap("map-kyushu",   "kyushu"),
+    buildMap("map-okinawa",  "okinawa"),
+    buildMap("map-honshu",   "honshu"),
+    buildMap("map-hokkaido", "hokkaido"),
+  ]);
+
+  // 概況ティッカー
+  await buildAndRenderTicker();
+
+  // 定期更新（10分毎 / ティッカーも更新）
+  setInterval(async () => {
+    const base = location.href.split("#")[0].split("?")[0];
+    location.replace(`${base}?v=${Date.now()}`);
+  }, 10*60*1000);
+});
+</script>
 </body>
 </html>
