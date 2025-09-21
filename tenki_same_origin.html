@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>全国天気3分割＋九州/沖縄上下分割（手動ズーム対応）</title>
+  <title>全国天気3分割＋九州/沖縄上下分割（7:3・手動ズーム対応）</title>
 
   <!-- Leaflet -->
   <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
@@ -11,13 +11,15 @@
 
   <style>
     html,body {height:100%; margin:0; background:#0b1220;}
-    /* 幅の比率（左=九州+沖縄 / 中央=本州 / 右=北海道） */
+
+    /* 幅の比率（左=九州+沖縄 / 中央=本州 / 右=北海道）と、左カラムの縦比率（7:3） */
     :root{
-      --w-left: 0.9;   /* 左カラム 少し狭く */
-      --w-center: 1.2; /* 本州 少し広く */
-      --w-right: 0.9;  /* 北海道 少し狭く */
-      --h-kyushu: 8;  /* 左カラムの縦比率（上=九州） */
-      --h-okinawa: 2; /* 左カラムの縦比率（下=沖縄） */
+      --w-left:   0.9;  /* 左カラム 少し狭く */
+      --w-center: 1.2;  /* 本州 少し広く   */
+      --w-right:  0.9;  /* 北海道 少し狭く */
+
+      --h-kyushu:  7;   /* 上：九州の比率  */
+      --h-okinawa: 3;   /* 下：沖縄の比率  */
     }
 
     .wrap {display:flex; height:100vh; width:100vw;}
@@ -27,14 +29,17 @@
     .panel[data-col="center"] { flex: var(--w-center); }
     .panel[data-col="right"]  { flex: var(--w-right); }
 
-    /* 左カラムを上下2段に分割 */
-    .panel[data-col="left"] .col-vert {
-      display:grid; height:100%; width:100%;
-      grid-template-rows: var(--h-kyushu)fr var(--h-okinawa)fr !important;
+    /* 左カラムを上下分割（縦Flexで確実に比率配分） */
+    .panel[data-col="left"] .col-vert{
+      display:flex; flex-direction:column;
+      height:100%; width:100%;
     }
+    .subpanel[data-region="kyushu"]  { flex: var(--h-kyushu) 1 0; }
+    .subpanel[data-region="okinawa"] { flex: var(--h-okinawa) 1 0; }
 
-    .subpanel {position:relative; min-height:0; } /* grid子要素 */
+    .subpanel {position:relative; min-height:0; overflow:hidden;}
     .map {position:absolute; inset:0;}
+
     .title{
       position:absolute; left:8px; top:6px; z-index:10; font-weight:800; color:#fff;
       text-shadow:0 0 3px rgba(0,0,0,.7),0 0 6px rgba(0,0,0,.4); letter-spacing:.05em;
@@ -106,15 +111,15 @@
 
   const USE_FIXED_VIEW = true; // サイネージでは固定表示
 
-  // ★手動で決めた固定ビュー（あなたの値を反映済み）
+  // 固定ビュー（必要に応じて調整）
   const PANEL_VIEW = {
     kyushu:   { center: [32.93989, 130.98492], zoom: 7 },
-    okinawa:  { center: [26.21240, 127.68093], zoom: 9 }, // お好みで調整
+    okinawa:  { center: [26.21240, 127.68093], zoom: 9 },
     honshu:   { center: [37.04665, 137.07624], zoom: 6 },
     hokkaido: { center: [41.76261, 142.96465], zoom: 6 },
   };
 
-  // 自動フィット用の保険
+  // 保険（自動フィット用：固定を使わない時だけ参照）
   const REGION_BOUNDS = {
     kyushu:   [[30.0, 128.0], [34.5, 132.8]],
     okinawa:  [[24.0, 122.5], [27.8, 129.8]],
@@ -148,8 +153,11 @@
   // ユーティリティ
   function iconText(text){ return L.divIcon({ className:"wx-label", html:text, iconSize:null, iconAnchor:[0,0] }); }
   async function loadJSON(id){
-    try{ const res = await fetch(`data/${id}.json?ts=${Date.now()}`, { cache:"no-store" });
-         if(!res.ok) return null; return await res.json(); } catch { return null; }
+    try{
+      const res = await fetch(`data/${id}.json?ts=${Date.now()}`, { cache:"no-store" });
+      if(!res.ok) return null;
+      return await res.json();
+    }catch{ return null; }
   }
   function wcToEmoji(wc){
     return ({0:"☀",1:"🌤",2:"⛅",3:"☁",45:"🌫",48:"🌫",51:"🌦",53:"🌦",55:"🌦",
@@ -193,7 +201,7 @@
       L.marker([p.lat,p.lon], { icon: iconText(label) }).addTo(map);
     }
 
-    // HUD
+    // HUD（edit=1）
     const hud = holder?.querySelector('.hud');
     if (IS_EDIT && hud){
       const latEl = hud.querySelector('.lat'), lonEl = hud.querySelector('.lon'), zEl = hud.querySelector('.z');
