@@ -1,11 +1,13 @@
 // scripts/fetch-openmeteo.js
-// Node >=18（fetch 標準）想定
-import fs from "fs";
-import path from "path";
+// Node 20 / CommonJS
+
+const fs = require("fs");
+const path = require("path");
 
 const OUT_DIR = "data";
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
+// === 地点リスト（HTMLの PLACES と一致させてあります） ===
 const places = [
   // 九州
   { id:"fukuoka",   name:"福岡市",   pref:"福岡県",   lat:33.58333, lon:130.39999 },
@@ -66,7 +68,7 @@ async function run(){
       try{
         data = await fetchOpenMeteo(p.lat, p.lon, true);   // まずJMA
       }catch{
-        data = await fetchOpenMeteo(p.lat, p.lon, false);  // だめなら自動
+        data = await fetchOpenMeteo(p.lat, p.lon, false);  // ダメなら自動
       }
 
       const out = {
@@ -85,8 +87,9 @@ async function run(){
     }
   }
 
-  // インデックス
-  fs.writeFileSync(path.join(OUT_DIR, "index.json"), JSON.stringify({ generatedAt: new Date().toISOString(), places:index }, null, 2));
+  fs.writeFileSync(path.join(OUT_DIR, "index.json"),
+    JSON.stringify({ generatedAt: new Date().toISOString(), places:index }, null, 2)
+  );
 
   console.log(`done. ok=${okCount} ng=${ngCount}`);
 }
