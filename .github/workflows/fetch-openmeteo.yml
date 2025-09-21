@@ -1,17 +1,9 @@
 name: Fetch Open-Meteo JSON
 
 on:
-  schedule:
-    - cron: "*/15 * * * *"    # 15分ごと
   workflow_dispatch:
-
-# 同時実行を止めて衝突回避
-concurrency:
-  group: fetch-openmeteo-json
-  cancel-in-progress: true
-
-permissions:
-  contents: write
+  schedule:
+    - cron: "*/30 * * * *"
 
 jobs:
   fetch:
@@ -19,46 +11,41 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          persist-credentials: true
 
-      - name: Setup Node
+      - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "20"
 
-      # ★ ここがポイント：常に最新のremote/mainに合わせる
-      - name: Sync to latest remote (hard reset)
-        run: |
-          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}}"
-          git fetch origin "$BRANCH"
-          git reset --hard "origin/$BRANCH"
+      - name: Install (none)
 
-      - name: Generate JSON
+      - name: Run fetch script
         run: node scripts/fetch-openmeteo.js
 
-      - name: Commit if changed
+      - name: Pull (rebase) then push with retry
         run: |
           git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/*.json || true
-          git diff --cached --quiet && echo "No changes to commit." && exit 0
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # 変更がなければ何もしない
+          if git diff --quiet; then
+            echo "No changes."
+            exit 0
+          fi
+
+          git add data/*.json
           git commit -m "chore(data): update open-meteo JSON [skip ci]"
 
-      # ★ push がはじかれたら、もう一度同期→再生成→push
-      - name: Push with one retry after re-sync
-        run: |
-          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}}"
-          set +e
-          git push origin "HEAD:$BRANCH"
-          if [ $? -ne 0 ]; then
-            echo "Push rejected, re-sync + regenerate + push again..."
-            git fetch origin "$BRANCH"
-            git reset --hard "origin/$BRANCH"
-            node scripts/fetch-openmeteo.js
-            git add data/*.json || true
-            git diff --cached --quiet && echo "No changes to commit after retry." && exit 0
-            git commit -m "chore(data): update open-meteo JSON [skip ci]"
-            git push origin "HEAD:$BRANCH"
-          fi
+          # 競合を避けるためrebase pull→push（2回まで再試行）
+          for i in 1 2; do
+            if git pull --rebase origin main; then
+              if git push origin HEAD:main; then
+                echo "Pushed."
+                exit 0
+              fi
+            fi
+            echo "Retry $i ..."
+            sleep 3
+          done
+
+          echo "Push failed"; exit 1
