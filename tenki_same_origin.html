@@ -87,8 +87,8 @@
   .wx-label .wx-emoji{ font-size: calc(1em * var(--emoji-scale)); line-height:1; filter: drop-shadow(0 0 2px rgba(0,0,0,.45)); }
   .wx-label .wx-temp{
     font-size: calc(1em * var(--temp-scale)); font-weight: 800; color:#fff;
-    -webkit-text-stroke: var(--temp-stroke) var(--temp-stroke-color);
-    text-shadow: 0 1px 4px rgba(0,0,0,.22);
+    -webkit-text-stroke: 0 /*var(--temp-stroke) var(--temp-stroke-color); */
+    text-shadow: 0 0 3px rgba(0,0,0,.35), 0 1px 6px rgba(0,0,0,.25);
   }
   .wx-emoji-img{ width: calc(20px * var(--emoji-scale)); height:auto; vertical-align: middle;
                  filter: drop-shadow(0 0 2px rgba(0,0,0,.5)); }
@@ -203,7 +203,6 @@ const PLACES = [
   { id:"morioka",   name:"盛岡市",   pref:"岩手県",   lat:39.70000, lon:141.15000 },
   { id:"sendai",    name:"仙台市",   pref:"宮城県",   lat:38.26884, lon:140.87194 },
   { id:"chiyoda",   name:"千代田",   pref:"東京都",   lat:35.69000, lon:139.76000 },
-  { id:"kisarazu",  name:"木更津市", pref:"千葉県",   lat:35.37610, lon:139.91700 },
   // 北海道
   { id:"sapporo",   name:"札幌市",   pref:"北海道",   lat:43.06417, lon:141.34694 },
   { id:"hakodate",  name:"函館市",   pref:"北海道",   lat:41.76870, lon:140.72880 },
