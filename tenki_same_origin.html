@@ -16,8 +16,8 @@
       --w-left: 0.9;   /* 左カラム 少し狭く */
       --w-center: 1.2; /* 本州 少し広く */
       --w-right: 0.9;  /* 北海道 少し狭く */
-      --h-kyushu: 0.70;  /* 左カラムの縦比率（上=九州） */
-      --h-okinawa: 0.30; /* 左カラムの縦比率（下=沖縄） */
+      --h-kyushu: 7;  /* 左カラムの縦比率（上=九州） */
+      --h-okinawa: 3; /* 左カラムの縦比率（下=沖縄） */
     }
 
     .wrap {display:flex; height:100vh; width:100vw;}
@@ -30,7 +30,7 @@
     /* 左カラムを上下2段に分割 */
     .panel[data-col="left"] .col-vert {
       display:grid; height:100%; width:100%;
-      grid-template-rows: calc(var(--h-kyushu)*1fr) calc(var(--h-okinawa)*1fr);
+      grid-template-rows: var(--h-kyushu)fr var(--h-okinawa)fr;
     }
 
     .subpanel {position:relative; min-height:0; } /* grid子要素 */
