@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>全国天気3分割マップ（手動ズーム設定対応）</title>
+  <title>全国天気3分割＋沖縄インセット（手動ズーム設定対応）</title>
 
   <!-- Leaflet -->
   <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
@@ -27,29 +27,37 @@
       position:absolute; right:8px; bottom:6px; font-size:.8rem; opacity:.8; color:#cfd6ea;
     }
     /* 調整用HUD（edit=1 のときだけ表示） */
-    .hud {
+    .hud{
       display:none; position:absolute; right:8px; top:6px; z-index:20;
       background:rgba(0,0,0,.35); color:#fff; padding:6px 8px; border-radius:8px;
       font-size:12px; line-height:1.4; box-shadow:0 4px 14px rgba(0,0,0,.25);
       backdrop-filter: blur(2px);
     }
-    .hud .row {white-space:nowrap}
-    .hud button {
+    .hud .row{white-space:nowrap}
+    .hud button{
       margin-left:6px; padding:2px 6px; border:1px solid rgba(255,255,255,.35);
       background:rgba(255,255,255,.1); color:#fff; border-radius:6px; cursor:pointer;
     }
-    .is-edit .hud {display:block;}
-    /* 追加：幅の比率（お好みで数字を調整） */
-  :root{
-    --w-kyushu: 0.9;   /* 少し狭く */
-    --w-honshu: 1.2;   /* 少し広く */
-    --w-hokkaido: 0.9; /* 少し狭く */
-    }
-    /* 既存 .panel はそのままでもOK。指定があれば上書きします */
+    .is-edit .hud{display:block;}
+
+    /* 幅の比率（お好みで調整） */
+    :root{ --w-kyushu:0.9; --w-honshu:1.2; --w-hokkaido:0.9; }
     .panel[data-region="kyushu"]   { flex: var(--w-kyushu); }
     .panel[data-region="honshu"]   { flex: var(--w-honshu); }
     .panel[data-region="hokkaido"] { flex: var(--w-hokkaido); }
-      
+
+    /* ▼ 沖縄インセット（左パネルの中に小窓マップ） */
+    .inset {
+      position:absolute; left:10px; bottom:10px; width:260px; height:170px; z-index:15;
+      border-radius:10px; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,.35);
+      border:1px solid rgba(255,255,255,.15); background:rgba(10,14,26,.35); backdrop-filter: blur(2px);
+    }
+    .inset .inset-title{
+      position:absolute; left:8px; top:6px; z-index:10; font-weight:800; color:#fff;
+      text-shadow:0 0 3px rgba(0,0,0,.7),0 0 6px rgba(0,0,0,.4);
+    }
+    .inset .inset-map{ width:100%; height:100%; }
+    .inset .hud{ right:6px; top:6px; font-size:11px; padding:4px 6px; }
   </style>
 </head>
 <body>
@@ -58,12 +66,21 @@
       <div class="title">九州・沖縄</div>
       <div class="hud"><div class="row">lat:<span class="lat"></span> lon:<span class="lon"></span> z:<span class="z"></span><button class="copy">Copy</button></div></div>
       <div id="map-kyushu" class="map"></div>
+
+      <!-- ▼ 沖縄インセット -->
+      <div class="inset" id="okinawa-inset">
+        <div class="inset-title">沖縄</div>
+        <div class="hud"><div class="row">lat:<span class="lat"></span> lon:<span class="lon"></span> z:<span class="z"></span><button class="copy">Copy</button></div></div>
+        <div id="okinawa-map" class="inset-map"></div>
+      </div>
     </div>
+
     <div class="panel" data-region="honshu">
       <div class="title">本州</div>
       <div class="hud"><div class="row">lat:<span class="lat"></span> lon:<span class="lon"></span> z:<span class="z"></span><button class="copy">Copy</button></div></div>
       <div id="map-honshu" class="map"></div>
     </div>
+
     <div class="panel" data-region="hokkaido">
       <div class="title">北海道</div>
       <div class="hud"><div class="row">lat:<span class="lat"></span> lon:<span class="lon"></span> z:<span class="z"></span><button class="copy">Copy</button></div></div>
@@ -77,37 +94,39 @@
   const TILE = 'https://cyberjapandata.gsi.go.jp/xyz/relief/{z}/{x}/{y}.png';
   const ATTR = '&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>';
 
-  // edit=1 のときはプレビューモード（パン・ズーム可能＆HUD表示）
   const urlp = new URLSearchParams(location.search);
   const IS_EDIT = urlp.get('edit') === '1';
   if (IS_EDIT) document.body.classList.add('is-edit');
 
-  // サイネージでは固定表示にする
-  const USE_FIXED_VIEW = true;
+  const USE_FIXED_VIEW = true; // サイネージ時は固定表示
 
-  // （必要に応じて書き換えてください）――手動決め打ちの中心・ズーム
-  // ここを調整して保存すれば、常にこの画角で表示されます
+  // ★手動で決めた固定ビュー（ユーザー値を反映）
   const PANEL_VIEW = {
-    kyushu:   { center: [31.7, 130.6], zoom: 7 },   // 例
-    honshu:   { center: [36.2, 137.4], zoom: 6 },   // 例
-    hokkaido: { center: [43.5, 143.0], zoom: 6 },   // 例（札幌中心付近に調整を）
+    kyushu:   { center: [32.93989, 130.98492], zoom: 7 },
+    honshu:   { center: [37.04665, 137.07624], zoom: 6 },
+    hokkaido: { center: [41.76261, 142.96465], zoom: 6 },
+  };
+  // インセット（沖縄）の固定ビュー
+  const INSET_VIEW = {
+    okinawa:  { center: [26.21240, 127.68093], zoom: 9 }  // 那覇中心・お好みで調整
   };
 
-  // 自動フィットを使う場合の範囲＆ズーム上限（固定表示にしたくないとき用の保険）
+  // 自動フィット用の保険（固定値を使わない場合）
   const REGION_BOUNDS = {
     kyushu:   [[24.0, 122.5], [34.2, 132.8]],
     honshu:   [[33.0, 130.0], [41.9, 142.5]],
     hokkaido: [[41.2, 139.0], [45.9, 146.5]],
+    okinawa:  [[24.0, 122.5], [27.5, 129.5]],
   };
-  const REGION_ZOOM_MAX = { kyushu:7, honshu:6, hokkaido:6 };
+  const REGION_ZOOM_MAX = { kyushu:7, honshu:6, hokkaido:6, okinawa:10 };
 
-  // ===== 2) 都市データ（必要に応じて追加OK） =====
+  // ===== 2) 都市 =====
   const PLACES = [
     // 九州・沖縄
     { id:"fukuoka",   name:"福岡市",   pref:"福岡県",   lat:33.58333, lon:130.39999 },
     { id:"miyazaki",  name:"宮崎市",   pref:"宮崎県",   lat:31.90778, lon:131.42028 },
     { id:"kagoshima", name:"鹿児島市", pref:"鹿児島県", lat:31.56670, lon:130.55000 },
-    { id:"naha",      name:"那覇市",   pref:"沖縄県",   lat:26.21240, lon:127.68093 }, // 任意
+    { id:"naha",      name:"那覇市",   pref:"沖縄県",   lat:26.21240, lon:127.68093 }, // インセットに表示
     // 本州（四国含む）
     { id:"osaka",     name:"大阪市",   pref:"大阪府",   lat:34.69374, lon:135.50217 },
     { id:"nagoya",    name:"名古屋市", pref:"愛知県",   lat:35.18145, lon:136.90640 },
@@ -118,11 +137,11 @@
     { id:"sendai",    name:"仙台市",   pref:"宮城県",   lat:38.26884, lon:140.87194 },
     { id:"chiyoda",   name:"千代田",   pref:"東京都",   lat:35.69000, lon:139.76000 },
     { id:"kisarazu",  name:"木更津市", pref:"千葉県",   lat:35.37610, lon:139.91700 },
-    // 北海道（代表：札幌）
+    // 北海道
     { id:"sapporo",   name:"札幌市",   pref:"北海道",   lat:43.06417, lon:141.34694 },
   ];
 
-  // ===== 3) 共通ユーティリティ =====
+  // ===== 3) ユーティリティ =====
   function iconText(text){
     return L.divIcon({ className:"wx-label", html:text, iconSize:null, iconAnchor:[0,0] });
   }
@@ -138,13 +157,14 @@
              61:"🌧",63:"🌧",65:"🌧",71:"🌨",73:"🌨",75:"🌨",95:"⛈",96:"⛈",99:"⛈"})[wc] ?? "⛅";
   }
   const subset = region => region==="kyushu"
-      ? PLACES.filter(p => ["福岡県","宮崎県","鹿児島県","沖縄県"].includes(p.pref))
+      ? PLACES.filter(p => ["福岡県","宮崎県","鹿児島県"].includes(p.pref)) // ←九州パネルから沖縄は除外
       : region==="hokkaido"
       ? PLACES.filter(p => p.pref==="北海道")
       : PLACES.filter(p => !["北海道","福岡県","宮崎県","鹿児島県","沖縄県"].includes(p.pref)); // 本州
+  const subsetOkinawa = () => PLACES.filter(p => p.pref==="沖縄県");
 
-  // ===== 4) マップ生成（固定 or 自動） =====
-  async function buildMap(elId, regionKey){
+  // ===== 4) 汎用マップ（3パネル） =====
+  async function buildPanelMap(elId, regionKey){
     const panelEl = document.querySelector(`[data-region="${regionKey}"]`);
     const map = L.map(elId, {
       zoomControl: IS_EDIT, attributionControl:false,
@@ -153,11 +173,9 @@
     });
     L.tileLayer(TILE, { attribution: ATTR, maxZoom: 18 }).addTo(map);
 
-    // 表示範囲の決定
-    if (USE_FIXED_VIEW && PANEL_VIEW[regionKey]?.center && PANEL_VIEW[regionKey]?.zoom){
+    if (USE_FIXED_VIEW && PANEL_VIEW[regionKey]){
       map.setView(PANEL_VIEW[regionKey].center, PANEL_VIEW[regionKey].zoom);
     } else {
-      // 自動フィット（保険）
       setTimeout(() => {
         map.invalidateSize(true);
         map.fitBounds(REGION_BOUNDS[regionKey], { padding:[20,20] });
@@ -166,7 +184,6 @@
       }, 0);
     }
 
-    // 都市ラベル
     for(const p of subset(regionKey)){
       const j  = await loadJSON(p.id);
       const t  = j?.current?.temperature_2m;
@@ -175,44 +192,79 @@
       L.marker([p.lat,p.lon], { icon: iconText(label) }).addTo(map);
     }
 
-    // 調整用HUD
-    if (IS_EDIT) {
-      const hud = panelEl.querySelector('.hud');
-      const latEl = hud.querySelector('.lat'), lonEl = hud.querySelector('.lon'), zEl = hud.querySelector('.z');
-      const copyBtn = hud.querySelector('.copy');
-      const updateHud = () => {
-        const c = map.getCenter();
-        latEl.textContent = c.lat.toFixed(5);
-        lonEl.textContent = c.lng.toFixed(5);
-        zEl.textContent = map.getZoom().toFixed(0);
-      };
-      map.on('moveend zoomend', updateHud);
-      updateHud();
-      copyBtn.addEventListener('click', async () => {
-        const c = map.getCenter(), z = map.getZoom();
-        const snippet = `  ${regionKey}: { center: [${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}], zoom: ${z} },`;
-        try { await navigator.clipboard.writeText(snippet); copyBtn.textContent = 'Copied!'; setTimeout(()=>copyBtn.textContent='Copy',1500); }
-        catch { alert(snippet); }
-      });
-    }
-
-    // サイズ確定（flex対策）
-    setTimeout(()=>map.invalidateSize(true), 0);
+    if (IS_EDIT) attachHud(map, panelEl.querySelector('.hud'), regionKey, 'panel');
+    setTimeout(()=>map.invalidateSize(true),0);
+    return map;
   }
 
-  // ===== 5) 初期化＆定期更新 =====
+  // ===== 5) 沖縄インセット =====
+  async function buildOkinawaInset(){
+    const el = document.getElementById('okinawa-inset');
+    const map = L.map('okinawa-map', {
+      zoomControl: IS_EDIT, attributionControl:false,
+      dragging: IS_EDIT, scrollWheelZoom: IS_EDIT, doubleClickZoom: IS_EDIT,
+      touchZoom: IS_EDIT, boxZoom: IS_EDIT, keyboard: IS_EDIT
+    });
+    L.tileLayer(TILE, { attribution: '', maxZoom: 18 }).addTo(map);
+
+    if (USE_FIXED_VIEW && INSET_VIEW.okinawa){
+      map.setView(INSET_VIEW.okinawa.center, INSET_VIEW.okinawa.zoom);
+    } else {
+      setTimeout(() => {
+        map.invalidateSize(true);
+        map.fitBounds(REGION_BOUNDS.okinawa, { padding:[12,12] });
+        const zmax = REGION_ZOOM_MAX.okinawa ?? map.getZoom();
+        if (map.getZoom() > zmax) map.setZoom(zmax);
+      }, 0);
+    }
+
+    for(const p of subsetOkinawa()){
+      const j  = await loadJSON(p.id);
+      const t  = j?.current?.temperature_2m;
+      const wc = j?.current?.weather_code ?? j?.daily?.weather_code?.[0];
+      const label = (typeof t === "number") ? `${wcToEmoji(wc)} ${Math.round(t)}℃` : `${p.name}`;
+      L.marker([p.lat,p.lon], { icon: iconText(label) }).addTo(map);
+    }
+
+    if (IS_EDIT) attachHud(map, el.querySelector('.hud'), 'okinawa', 'inset');
+    setTimeout(()=>map.invalidateSize(true),0);
+    return map;
+  }
+
+  // ===== 6) HUD（Copy で設定スニペットを取得） =====
+  function attachHud(map, hudEl, key, kind){
+    const latEl = hudEl.querySelector('.lat'), lonEl = hudEl.querySelector('.lon'), zEl = hudEl.querySelector('.z');
+    const copyBtn = hudEl.querySelector('.copy');
+    const updateHud = () => {
+      const c = map.getCenter();
+      latEl.textContent = c.lat.toFixed(5);
+      lonEl.textContent = c.lng.toFixed(5);
+      zEl.textContent = map.getZoom().toFixed(0);
+    };
+    map.on('moveend zoomend', updateHud); updateHud();
+    copyBtn.addEventListener('click', async () => {
+      const c = map.getCenter(), z = map.getZoom();
+      const snippet = (kind==='inset')
+        ? `  okinawa: { center: [${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}], zoom: ${z} },`
+        : `  ${key}: { center: [${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}], zoom: ${z} },`;
+      try { await navigator.clipboard.writeText(snippet); copyBtn.textContent='Copied!'; setTimeout(()=>copyBtn.textContent='Copy',1500); }
+      catch { alert(snippet); }
+    });
+  }
+
+  // ===== 7) 初期化 =====
   window.addEventListener("load", async () => {
     await Promise.all([
-      buildMap("map-kyushu",   "kyushu"),
-      buildMap("map-honshu",   "honshu"),
-      buildMap("map-hokkaido", "hokkaido"),
+      buildPanelMap("map-kyushu",   "kyushu"),
+      buildPanelMap("map-honshu",   "honshu"),
+      buildPanelMap("map-hokkaido", "hokkaido"),
+      buildOkinawaInset(),
     ]);
     if (!IS_EDIT) {
-      // サイネージ時のみ、10分おき再読込
       setInterval(() => {
         const base = location.href.split("#")[0].split("?")[0];
         location.replace(`${base}?v=${Date.now()}`);
-      }, 10 * 60 * 1000);
+      }, 10*60*1000);
     }
   });
   </script>
