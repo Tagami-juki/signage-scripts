@@ -20,6 +20,7 @@ const places = [
   { id: "toyama",   name: "富山市",   lat: 36.69592, lon: 137.21369 },
   { id: "miyazaki", name: "宮崎市",   lat: 31.90778, lon: 131.42028 },
   { id: "kagoshima",name: "鹿児島市", lat: 31.56670, lon: 130.55000 },
+  { id: "naha", name: "那覇市", lat: 26.21240, lon: 127.68093 },
   // 既存の千代田など残す場合は↓に並べてOK
   { id: "chiyoda",  name: "千代田",   lat: 35.69,    lon: 139.76    },
 ];
