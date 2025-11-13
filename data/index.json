@@ -1,6 +1,27 @@
 {
-  "generatedAt": "2025-11-13T21:38:55.571Z",
+  "generatedAt": "2025-11-13T21:52:28.243Z",
   "places": [
+    {
+      "id": "fukuoka",
+      "name": "福岡市",
+      "pref": "福岡県",
+      "lat": 33.58333,
+      "lon": 130.39999
+    },
+    {
+      "id": "kumamoto",
+      "name": "熊本市",
+      "pref": "熊本県",
+      "lat": 32.8031,
+      "lon": 130.7079
+    },
+    {
+      "id": "nagasaki",
+      "name": "長崎市",
+      "pref": "長崎県",
+      "lat": 32.7503,
+      "lon": 129.8777
+    },
     {
       "id": "oita",
       "name": "大分市",
