@@ -7,9 +7,9 @@
     "lon": 142.383
   },
   "current": {
-    "time": "2025-11-17T05:30",
+    "time": "2025-11-17T05:45",
     "interval": 900,
-    "temperature_2m": 7.2,
+    "temperature_2m": 6.8,
     "weather_code": 2
   },
   "daily": {
@@ -50,5 +50,5 @@
       -2.7
     ]
   },
-  "updatedAt": "2025-11-16T20:41:39.528Z"
+  "updatedAt": "2025-11-16T20:54:10.145Z"
 }
