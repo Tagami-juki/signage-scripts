@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-01-25T20:30:14.747Z",
+  "generatedAt": "2026-01-25T20:49:08.322Z",
   "places": [
     {
       "id": "fukuoka",
@@ -7,6 +7,13 @@
       "pref": "福岡県",
       "lat": 33.58333,
       "lon": 130.39999
+    },
+    {
+      "id": "kumamoto",
+      "name": "熊本市",
+      "pref": "熊本県",
+      "lat": 32.8031,
+      "lon": 130.7079
     },
     {
       "id": "nagasaki",
