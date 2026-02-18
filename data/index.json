@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-02-18T10:00:16.076Z",
+  "generatedAt": "2026-02-18T10:59:20.122Z",
   "places": [
     {
       "id": "fukuoka",
@@ -140,6 +140,13 @@
       "pref": "北海道",
       "lat": 43.06417,
       "lon": 141.34694
+    },
+    {
+      "id": "hakodate",
+      "name": "函館市",
+      "pref": "北海道",
+      "lat": 41.7687,
+      "lon": 140.7288
     },
     {
       "id": "wakkanai",
