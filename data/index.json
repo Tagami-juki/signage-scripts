@@ -1,6 +1,13 @@
 {
-  "generatedAt": "2026-02-28T09:00:20.036Z",
+  "generatedAt": "2026-02-28T09:36:42.014Z",
   "places": [
+    {
+      "id": "fukuoka",
+      "name": "福岡市",
+      "pref": "福岡県",
+      "lat": 33.58333,
+      "lon": 130.39999
+    },
     {
       "id": "kumamoto",
       "name": "熊本市",
