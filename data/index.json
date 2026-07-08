@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-08T09:55:50.283Z",
+  "generatedAt": "2026-07-08T11:50:04.463Z",
   "places": [
     {
       "id": "fukuoka",
@@ -84,48 +84,6 @@
       "pref": "秋田県",
       "lat": 39.72,
       "lon": 140.1035
-    },
-    {
-      "id": "ishikawa",
-      "name": "金沢市",
-      "pref": "石川県",
-      "lat": 36.5613,
-      "lon": 136.6562
-    },
-    {
-      "id": "shizuoka",
-      "name": "静岡市",
-      "pref": "静岡県",
-      "lat": 34.9756,
-      "lon": 138.3828
-    },
-    {
-      "id": "okayama",
-      "name": "岡山市",
-      "pref": "岡山県",
-      "lat": 34.655,
-      "lon": 133.9195
-    },
-    {
-      "id": "yamaguchi",
-      "name": "山口市",
-      "pref": "山口県",
-      "lat": 34.1783,
-      "lon": 131.4736
-    },
-    {
-      "id": "morioka",
-      "name": "盛岡市",
-      "pref": "岩手県",
-      "lat": 39.7,
-      "lon": 141.15
-    },
-    {
-      "id": "sendai",
-      "name": "仙台市",
-      "pref": "宮城県",
-      "lat": 38.26884,
-      "lon": 140.87194
     },
     {
       "id": "chiyoda",
